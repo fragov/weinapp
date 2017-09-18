@@ -39,7 +39,7 @@ public class MainActivity extends AppCompatActivity {
 
         buttonDatabase = (Button) findViewById(R.id.button_database);
 
-        buttonMap.setOnClickListener(new View.OnClickListener() {
+        buttonDatabase.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 Intent i = new Intent(MainActivity.this, DB.class);
@@ -49,7 +49,7 @@ public class MainActivity extends AppCompatActivity {
 
         buttonGPS = (Button) findViewById(R.id.button_gps);
 
-        buttonMap.setOnClickListener(new View.OnClickListener() {
+        buttonGPS.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 Intent i = new Intent(MainActivity.this, GPS.class);
