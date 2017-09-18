@@ -8,6 +8,9 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 
 import com.mapbox.mapboxsdk.Mapbox;
+import com.mapbox.mapboxsdk.annotations.MarkerViewOptions;
+import com.mapbox.mapboxsdk.annotations.PolylineOptions;
+import com.mapbox.mapboxsdk.geometry.LatLng;
 import com.mapbox.mapboxsdk.maps.MapView;
 import com.mapbox.mapboxsdk.maps.MapboxMap;
 import com.mapbox.mapboxsdk.maps.OnMapReadyCallback;
@@ -43,9 +46,19 @@ public class Map extends AppCompatActivity {
         mapView.getMapAsync(new OnMapReadyCallback() {
             @Override
             public void onMapReady(MapboxMap mapboxMap) {
+                MarkerViewOptions markerViewOptions = new MarkerViewOptions()
+                        .position(new LatLng(-33.85699436, 151.21510684));
+
+                mapboxMap.addMarker(markerViewOptions);
+                PolylineOptions options = new PolylineOptions();
+                options.add(new LatLng(-32.85699436, 150.21510684));
+                options.add(new LatLng(-31.85699436, 149.21510684));
+                options.add(new LatLng(-31.85699436, 147.21510684));
+                mapboxMap.addPolyline(options);
 
             }
         });
+
     }
 
 
