@@ -6,6 +6,9 @@ import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
+import android.view.View;
+import android.widget.Button;
+import android.widget.TextView;
 
 public class GPS extends AppCompatActivity implements LocationListener {
 
@@ -13,17 +16,37 @@ public class GPS extends AppCompatActivity implements LocationListener {
     private double latitude;
     private double longitude;
 
+    private Button button;
+    private TextView textView1;
+    private TextView textView2;
+
+    private boolean gpsEnabled;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_gps);
         // initialize LocationManager instance
         locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+
+        gpsEnabled = false;
+        button = (Button) findViewById(R.id.button);
+        button.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if(gpsEnabled) {
+                    disableGps();
+                } else {
+                    enableGps();
+                }
+            }
+        });
+        textView1 = (TextView) findViewById(R.id.textView1);
+        textView2 = (TextView) findViewById(R.id.textView2);
+
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
+    private void enableGps() {
         // check permissions and enable location sensors accordingly
         int gpsPermission = getBaseContext().checkCallingOrSelfPermission("android.permission.ACCESS_FINE_LOCATION");
         int networkPermission = getBaseContext().checkCallingOrSelfPermission("android.permission.ACCESS_COARSE_LOCATION");
@@ -34,13 +57,15 @@ public class GPS extends AppCompatActivity implements LocationListener {
         } else {
             locationManager.requestLocationUpdates(LocationManager.PASSIVE_PROVIDER, 10000, 0, this);
         }
+        gpsEnabled = true;
     }
 
-    @Override
-    protected void onPause() {
-        super.onPause();
+    private void disableGps() {
         // disable location sensors when activity is paused
         locationManager.removeUpdates(this);
+        textView1.setText("");
+        textView2.setText("");
+        gpsEnabled = false;
     }
 
     /**
@@ -52,7 +77,9 @@ public class GPS extends AppCompatActivity implements LocationListener {
     public void onLocationChanged(Location location) {
         if (location != null) {
             latitude = location.getLatitude();
+            textView1.setText(String.valueOf(latitude));
             longitude = location.getLongitude();
+            textView2.setText(String.valueOf(longitude));
         }
     }
 
