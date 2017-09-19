@@ -2,22 +2,18 @@ package com.wein3.weinapp;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
-import android.graphics.Color;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.os.Bundle;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
-import android.util.Log;
 import android.widget.Toast;
 
 import com.mapbox.mapboxsdk.Mapbox;
-import com.mapbox.mapboxsdk.annotations.MarkerViewOptions;
 import com.mapbox.mapboxsdk.annotations.PolylineOptions;
 import com.mapbox.mapboxsdk.camera.CameraPosition;
-import com.mapbox.mapboxsdk.constants.MyLocationTracking;
 import com.mapbox.mapboxsdk.geometry.LatLng;
 import com.mapbox.mapboxsdk.maps.MapView;
 import com.mapbox.mapboxsdk.maps.MapboxMap;
@@ -25,7 +21,7 @@ import com.mapbox.mapboxsdk.maps.OnMapReadyCallback;
 
 import java.util.List;
 
-public class Map extends AppCompatActivity implements LocationListener{
+public class Map extends AppCompatActivity implements LocationListener {
 
     public static final String TAG = Map.class.getSimpleName();
 
@@ -52,14 +48,14 @@ public class Map extends AppCompatActivity implements LocationListener{
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             // show user dialog
             if (!ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_COARSE_LOCATION)) {
-                ActivityCompat.requestPermissions(this, new String[] {Manifest.permission.ACCESS_COARSE_LOCATION}, 1);
+                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, 1);
             }
         }
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             // show user dialog
             if (!ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_FINE_LOCATION)) {
-                ActivityCompat.requestPermissions(this, new String[] {Manifest.permission.ACCESS_FINE_LOCATION}, 1);
+                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
             }
         }
 
@@ -69,11 +65,6 @@ public class Map extends AppCompatActivity implements LocationListener{
             @Override
             public void onMapReady(MapboxMap mapboxMap) {
                 map = mapboxMap;
-                PolylineOptions opt = new PolylineOptions();
-                opt.add(new LatLng(-32.85699436, 150.21510684));
-                opt.add(new LatLng(-31.85699436, 149.21510684));
-                opt.add(new LatLng(-30.85699436, 147.21510684));
-                mapboxMap.addPolyline(opt);
             }
         });
 
@@ -81,9 +72,6 @@ public class Map extends AppCompatActivity implements LocationListener{
                 .target(new LatLng(41.327752, 19.818666)) // Sets the center of the map to the specified location
                 .zoom(13)                            // Sets the zoom level
                 .build();
-
-        //options.add(new LatLng(41.327752, 19.818666));
-
     }
 
 
@@ -148,9 +136,7 @@ public class Map extends AppCompatActivity implements LocationListener{
             longitude = location.getLongitude();
         }
         map.addPolyline(options.add(new LatLng(latitude, longitude)));
-        map.addPolyline(new PolylineOptions().add(new LatLng(-25.85699436, 140.21510684)));
-        System.out.println(latitude + " und "+ longitude);
-        Toast.makeText(getApplicationContext(), latitude +" "+ longitude , Toast.LENGTH_LONG).show();
+        Toast.makeText(getApplicationContext(), latitude + " " + longitude, Toast.LENGTH_LONG).show();
     }
 
     @Override
