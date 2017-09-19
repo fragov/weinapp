@@ -2,28 +2,52 @@ package com.wein3.weinapp;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
+import android.widget.Toast;
 
 import com.mapbox.mapboxsdk.Mapbox;
 import com.mapbox.mapboxsdk.annotations.MarkerViewOptions;
 import com.mapbox.mapboxsdk.annotations.PolylineOptions;
+import com.mapbox.mapboxsdk.camera.CameraPosition;
+import com.mapbox.mapboxsdk.constants.MyLocationTracking;
 import com.mapbox.mapboxsdk.geometry.LatLng;
 import com.mapbox.mapboxsdk.maps.MapView;
 import com.mapbox.mapboxsdk.maps.MapboxMap;
 import com.mapbox.mapboxsdk.maps.OnMapReadyCallback;
 
-public class Map extends AppCompatActivity {
+import java.util.List;
+
+public class Map extends AppCompatActivity implements LocationListener{
+
+    public static final String TAG = Map.class.getSimpleName();
 
     private MapView mapView;
+    private MapboxMap map;
+    private LocationManager locationManager;
+    private double latitude;
+    private double longitude;
+    boolean hasNew = false;
+    private List<LatLng> Points;
+    private PolylineOptions options = new PolylineOptions();
+    private LocationManager manager;
+    private LocationListener listener;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         Mapbox.getInstance(this, getString(R.string.access_token));
         setContentView(R.layout.activity_map);
+
+        locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             // show user dialog
@@ -41,23 +65,24 @@ public class Map extends AppCompatActivity {
 
         mapView = (MapView) findViewById(R.id.mapview);
         mapView.onCreate(savedInstanceState);
-
-
         mapView.getMapAsync(new OnMapReadyCallback() {
             @Override
             public void onMapReady(MapboxMap mapboxMap) {
-                MarkerViewOptions markerViewOptions = new MarkerViewOptions()
-                        .position(new LatLng(-33.85699436, 151.21510684));
-
-                mapboxMap.addMarker(markerViewOptions);
-                PolylineOptions options = new PolylineOptions();
-                options.add(new LatLng(-32.85699436, 150.21510684));
-                options.add(new LatLng(-31.85699436, 149.21510684));
-                options.add(new LatLng(-31.85699436, 147.21510684));
-                mapboxMap.addPolyline(options);
-
+                map = mapboxMap;
+                PolylineOptions opt = new PolylineOptions();
+                opt.add(new LatLng(-32.85699436, 150.21510684));
+                opt.add(new LatLng(-31.85699436, 149.21510684));
+                opt.add(new LatLng(-30.85699436, 147.21510684));
+                mapboxMap.addPolyline(opt);
             }
         });
+
+        CameraPosition cameraPosition = new CameraPosition.Builder()
+                .target(new LatLng(41.327752, 19.818666)) // Sets the center of the map to the specified location
+                .zoom(13)                            // Sets the zoom level
+                .build();
+
+        //options.add(new LatLng(41.327752, 19.818666));
 
     }
 
@@ -72,12 +97,22 @@ public class Map extends AppCompatActivity {
     public void onResume() {
         super.onResume();
         mapView.onResume();
+        int gpsPermission = getBaseContext().checkCallingOrSelfPermission("android.permission.ACCESS_FINE_LOCATION");
+        int networkPermission = getBaseContext().checkCallingOrSelfPermission("android.permission.ACCESS_COARSE_LOCATION");
+        if (gpsPermission == PackageManager.PERMISSION_GRANTED) {
+            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 10000, 0, this);
+        } else if (networkPermission == PackageManager.PERMISSION_GRANTED) {
+            locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 10000, 0, this);
+        } else {
+            locationManager.requestLocationUpdates(LocationManager.PASSIVE_PROVIDER, 10000, 0, this);
+        }
     }
 
     @Override
     public void onPause() {
         super.onPause();
         mapView.onPause();
+        locationManager.removeUpdates(this);
     }
 
     @Override
@@ -102,5 +137,34 @@ public class Map extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         mapView.onDestroy();
+    }
+
+
+    @Override
+    public void onLocationChanged(Location location) {
+
+        if (location != null) {
+            latitude = location.getLatitude();
+            longitude = location.getLongitude();
+        }
+        map.addPolyline(options.add(new LatLng(latitude, longitude)));
+        map.addPolyline(new PolylineOptions().add(new LatLng(-25.85699436, 140.21510684)));
+        System.out.println(latitude + " und "+ longitude);
+        Toast.makeText(getApplicationContext(), latitude +" "+ longitude , Toast.LENGTH_LONG).show();
+    }
+
+    @Override
+    public void onStatusChanged(String provider, int status, Bundle extras) {
+
+    }
+
+    @Override
+    public void onProviderEnabled(String provider) {
+
+    }
+
+    @Override
+    public void onProviderDisabled(String provider) {
+
     }
 }
