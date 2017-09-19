@@ -9,6 +9,7 @@ import android.os.Bundle;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
+import android.widget.Toast;
 
 import com.mapbox.mapboxsdk.Mapbox;
 import com.mapbox.mapboxsdk.annotations.PolylineOptions;
@@ -133,6 +134,7 @@ public class Map extends AppCompatActivity implements LocationListener {
             longitude = location.getLongitude();
         }
         options.add(new LatLng(latitude, longitude));
+        Toast.makeText(getApplicationContext(), "" + latitude + ", " + longitude, Toast.LENGTH_SHORT).show();
     }
 
     @Override
