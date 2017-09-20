@@ -1,10 +1,17 @@
 package com.wein3.weinapp;
 
 import android.Manifest;
+import android.app.AlertDialog;
+import android.content.Context;
+import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Location;
+import android.os.Build;
+import android.location.LocationManager;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.support.annotation.Nullable;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.NavigationView;
@@ -18,6 +25,8 @@ import android.support.v7.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.Window;
+import android.widget.Toast;
 
 import com.mapbox.mapboxsdk.Mapbox;
 import com.mapbox.mapboxsdk.annotations.PolylineOptions;
@@ -35,6 +44,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
 
     private MapboxMap mapboxMap;
     private PolylineOptions options;
+    Location myLocation;
 
     private boolean gpsTrackingEnabled;
 
@@ -71,26 +81,43 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
                 ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
             }
         }
-
         mapView = (MapView) findViewById(R.id.mapView);
         mapView.onCreate(savedInstanceState);
+
         mapView.getMapAsync(new OnMapReadyCallback() {
             @Override
             public void onMapReady(MapboxMap mbMap) {
-                // initialize map
                 mapboxMap = mbMap;
+                final LocationManager manager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+                // get current location
                 mapboxMap.getUiSettings().setCompassMargins(mapboxMap.getUiSettings().getCompassMarginLeft(),
                         mapboxMap.getUiSettings().getCompassMarginTop()+80, mapboxMap.getUiSettings().getCompassMarginRight(),
                         mapboxMap.getUiSettings().getCompassMarginBottom()-80);
                 mapboxMap.setMyLocationEnabled(true);
-                mapboxMap.setOnMyLocationChangeListener(Map.this);
-                // get current location
-                LatLng currentPosition = getCurrentLocation();
-                // move camera to current location
-                CameraPosition cameraPosition = new CameraPosition.Builder().target(currentPosition).zoom(16).build();
-                mapboxMap.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition), 25000, null);
+                myLocation = mapboxMap.getMyLocation();
+                if (!manager.isProviderEnabled( LocationManager.GPS_PROVIDER ) ) {
+                    showGPSDisabledDialog();
+                }
+                else {
+                    // initialize map
+                    mapboxMap.setOnMyLocationChangeListener(Map.this);
+                    LatLng currentPosition = new LatLng(myLocation.getLatitude(), myLocation.getLongitude());
+                    // move camera to current location
+                    CameraPosition cameraPosition = new CameraPosition.Builder().target(currentPosition).build();
+                    mapboxMap.moveCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
+                    // add current location as first point to the polyline
+                    options = new PolylineOptions();
+                    options.width(5);
+                    options.color(3);
+                    options.add(currentPosition);
+                    mapboxMap.addPolyline(options);
+                }
             }
         });
+
+
+
+
     }
 
     @Override
@@ -160,6 +187,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
     public void onResume() {
         super.onResume();
         mapView.onResume();
+
     }
 
     @Override
@@ -258,5 +286,26 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
             CameraPosition cameraPosition = new CameraPosition.Builder().target(currentPosition).zoom(currentZoom).build();
             mapboxMap.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition), 25000, null);
         }
+    }
+
+    public void showGPSDisabledDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("GPS ist aus!");
+        builder.setMessage("Gps ist ausgeschaltet. Es sind nicht alle Funktionen ohne GPS verfügbar. GPS anschalten?");
+        builder.setPositiveButton("GPS anschalten", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+
+                startActivity(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS));
+
+            }
+        }).setNegativeButton("Weiter ohne GPS", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+
+            }
+        });
+        builder.create();
+        builder.show();
     }
 }
