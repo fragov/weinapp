@@ -13,7 +13,7 @@ public class Area {
     private String currentUsage;
     private String currentLandUsage;
     private String category;
-    private Integer channelWidht;
+    private Integer channelWidth;
     private Integer wineRowsCount;
     private Integer wineRowsLength;
     private Integer vinesCount;
@@ -100,12 +100,12 @@ public class Area {
         this.category = category;
     }
 
-    public Integer getChannelWidht() {
-        return channelWidht;
+    public Integer getChannelWidth() {
+        return channelWidth;
     }
 
-    public void setChannelWidht(Integer channelWidht) {
-        this.channelWidht = channelWidht;
+    public void setChannelWidth(Integer channelWidth) {
+        this.channelWidth = channelWidth;
     }
 
     public Integer getWineRowsCount() {

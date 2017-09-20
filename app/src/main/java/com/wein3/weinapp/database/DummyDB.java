@@ -8,11 +8,9 @@ import java.util.HashMap;
 
 public class DummyDB implements Database {
 
-    private static final String TAG = "Database::DummyDB";
-
     @Override
-    public boolean init() {
-        return true;
+    public void init() {
+
     }
 
     @Override
@@ -41,7 +39,7 @@ public class DummyDB implements Database {
                 area.setCurrentUsage("Weinberg");
                 area.setCurrentLandUsage("Direktzug");
                 area.setCategory("Ertragsfläche");
-                area.setChannelWidht(2);
+                area.setChannelWidth(2);
                 area.setWineRowsCount(30);
                 area.setWineRowsLength(60);
                 area.setVinesCount(75);
@@ -57,7 +55,7 @@ public class DummyDB implements Database {
     }
 
     @Override
-    public void updateArea(String id, Area area) {
+    public void updateArea(Area area) {
 
     }
 
