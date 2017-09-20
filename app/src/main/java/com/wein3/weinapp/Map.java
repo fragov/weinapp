@@ -1,6 +1,7 @@
 package com.wein3.weinapp;
 
 import android.Manifest;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.location.Location;
@@ -141,7 +142,8 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
         int id = item.getItemId();
 
         if (id == R.id.Action1) {
-            // Handle the camera action
+            Intent intent = new Intent(Map.this, GPS.class);
+            startActivity(intent);
         } else if (id == R.id.Action2) {
 
         } else if (id == R.id.Action3) {
