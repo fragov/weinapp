@@ -1,23 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:mapbox="http://schemas.android.com/apk/res-auto"
+<android.support.v4.widget.DrawerLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/drawer_layout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context="com.wein3.weinapp.Map">
+    android:fitsSystemWindows="true"
+    tools:openDrawer="start">
 
-    <com.mapbox.mapboxsdk.maps.MapView
-        android:id="@+id/mapView"
+    <include
+        layout="@layout/app_bar_map"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        mapbox:mapbox_styleUrl="@string/mapbox_style_mapbox_streets" />
+        android:layout_height="match_parent" />
 
-    <android.support.design.widget.FloatingActionButton
-        android:id="@+id/fab"
+    <android.support.design.widget.NavigationView
+        android:id="@+id/nav_view"
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:clickable="true"
-        mapbox:fabSize="mini"
-        mapbox:srcCompat="@android:drawable/ic_media_play" />
+        android:layout_height="match_parent"
+        android:layout_gravity="start"
+        android:fitsSystemWindows="true"
+        app:headerLayout="@layout/nav_header_map"
+        app:menu="@menu/activity_map_drawer" />
 
-</RelativeLayout>
+</android.support.v4.widget.DrawerLayout>
