@@ -1,14 +1,19 @@
 package com.wein3.weinapp;
 
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.hardware.usb.UsbDevice;
+import android.hardware.usb.UsbDeviceConnection;
+import android.hardware.usb.UsbEndpoint;
+import android.hardware.usb.UsbInterface;
 import android.hardware.usb.UsbManager;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.mapbox.mapboxsdk.geometry.LatLng;
 
@@ -24,6 +29,13 @@ public class GPS extends AppCompatActivity {
 
     private LatLng lastKnownLatLng;
     private boolean hasPos = false;
+
+    private byte[] bytes;
+    private static int TIMEOUT = 1000;
+    private boolean forceClaim = true;
+
+    private UsbInterface intf;
+    private UsbDeviceConnection connection;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -69,6 +81,7 @@ public class GPS extends AppCompatActivity {
 
                 Intent intent = getIntent();
                 UsbDevice device = (UsbDevice) intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+                if(device == null) return;
                 stringBuilder.append("Device ID: ");
                 stringBuilder.append(device.getDeviceId());
                 stringBuilder.append('\n');
@@ -114,12 +127,49 @@ public class GPS extends AppCompatActivity {
                 textViewLong.setText(Double.toString(loc.getLongitude()));
                 */
 
+                bytes = new byte[1000];
+
                 //https://developer.android.com/guide/topics/connectivity/usb/host.html#working-d
+                intf = device.getInterface(0);
+                UsbEndpoint endpoint = intf.getEndpoint(0);
+                connection = manager.openDevice(device);
+                connection.claimInterface(intf, forceClaim);
+                connection.bulkTransfer(endpoint, bytes, bytes.length, TIMEOUT);
+
+                //I should put this into the Manifest
+                BroadcastReceiver broadcastReceiver = new BroadcastReceiver() {
+                    @Override
+                    public void onReceive(Context context, Intent intent) {
+                        String action  = intent.getAction();
+
+                        if(UsbManager.ACTION_USB_ACCESSORY_DETACHED.equals(action)) {
+                            UsbDevice device = (UsbDevice) intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+                            if(device != null) {
+                                connection.releaseInterface(intf);
+                                connection.close();
+                                Toast.makeText(getApplicationContext(), "DETACHED - not null", Toast.LENGTH_SHORT).show();
+                            } else {
+                                Toast.makeText(getApplicationContext(), "DETACHED - null", Toast.LENGTH_SHORT).show();
+                            }
+                        }
+                    }
+                };
+
+                StringBuilder raw = new StringBuilder();
+                for(int i=0; i<bytes.length; i++) {
+                    char c = (char) bytes[i];
+                    raw.append(c);
+                }
+                textViewLong.setText(raw);
             }
         });
     }
 
     public LatLng getLastKnownLatLng() {
         return this.lastKnownLatLng;
+    }
+
+    private void closit() {
+        Toast.makeText(getApplicationContext(), "Not yet implemented", Toast.LENGTH_SHORT).show();
     }
 }
