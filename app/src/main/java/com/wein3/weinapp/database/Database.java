@@ -1,6 +1,6 @@
 package com.wein3.weinapp.database;
 
-import com.wein3.weinapp.PolygonData;
+import com.wein3.weinapp.Area;
 
 import java.util.HashMap;
 
@@ -12,37 +12,37 @@ public interface Database {
     boolean init();
 
     /**
-     * Get list of available polygons as HashMap of String ids and String descriptions
+     * Get list of available areas as HashMap of String ids and String descriptions
      * @return HashMap of polygons
      */
-    HashMap<String, String> getPolygonsList();
+    HashMap<String, String> getListOfAreas();
 
     /**
-     * Get polygon data by id
-     * @param id ID of Polygon in database
+     * Get area by id
+     * @param id ID of Area in database
      * @return Polygon data
      */
-    PolygonData getPolygonData(String id);
+    Area getAreaById(String id);
 
     /**
-     * Add new polygon to database
-     * @param polygonData Polygon Data
+     * Add new area to database
+     * @param area Area Object
      * @return id of new Polygon
      */
-    String insertPolygonData(PolygonData polygonData);
+    String insertArea(Area area);
 
     /**
-     * Update polygon in database
-     * @param id ID of Polygon in database
-     * @param polygonData Polygon Data
+     * Update existing area in database
+     * @param id ID of Area in database
+     * @param area Area Object
      */
-    void updatePolygonData(String id, PolygonData polygonData);
+    void updateArea(String id, Area area);
 
     /**
-     * Removes polygon from database
-     * @param id ID of Polygon in database
+     * Removes area from database
+     * @param id ID of Area in database
      */
-    void removePolygonData(String id);
+    void removeAreaById(String id);
 
     /**
      * Close database
