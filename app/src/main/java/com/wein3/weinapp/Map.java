@@ -9,11 +9,11 @@ import android.support.design.widget.FloatingActionButton;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
-import android.widget.Toast;
 
 import com.mapbox.mapboxsdk.Mapbox;
 import com.mapbox.mapboxsdk.annotations.PolylineOptions;
 import com.mapbox.mapboxsdk.camera.CameraPosition;
+import com.mapbox.mapboxsdk.camera.CameraUpdateFactory;
 import com.mapbox.mapboxsdk.geometry.LatLng;
 import com.mapbox.mapboxsdk.maps.MapView;
 import com.mapbox.mapboxsdk.maps.MapboxMap;
@@ -50,41 +50,20 @@ public class Map extends AppCompatActivity implements MapboxMap.OnMyLocationChan
         mapView.getMapAsync(new OnMapReadyCallback() {
             @Override
             public void onMapReady(MapboxMap mbMap) {
+                // initialize map
                 mapboxMap = mbMap;
                 mapboxMap.setMyLocationEnabled(true);
+                mapboxMap.setOnMyLocationChangeListener(Map.this);
+                // get current location
                 Location myLocation = mapboxMap.getMyLocation();
                 LatLng currentPosition = new LatLng(myLocation.getLatitude(), myLocation.getLongitude());
-                CameraPosition cameraPosition = new CameraPosition.Builder().target(currentPosition).zoom(16).build();
-                mapboxMap.setCameraPosition(cameraPosition);
-                mapboxMap.setOnMyLocationChangeListener(Map.this);
+                // move camera to current location
+                CameraPosition cameraPosition = new CameraPosition.Builder().target(currentPosition).build();
+                mapboxMap.moveCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
+                // add current location as first point to the polyline
                 options = new PolylineOptions();
-                Location location = mapboxMap.getMyLocation();
-                double latitude = location.getLatitude();
-                double longitude = location.getLongitude();
-                options.add(new LatLng(latitude, longitude));
+                options.add(currentPosition);
                 mapboxMap.addPolyline(options);
-
-                // options = new PolylineOptions();
-                /**
-                 Location location;
-                 // get the user's last known location as the first point of the polyline
-                 int gpsPermission = getBaseContext().checkCallingOrSelfPermission("android.permission.ACCESS_FINE_LOCATION");
-                 int networkPermission = getBaseContext().checkCallingOrSelfPermission("android.permission.ACCESS_COARSE_LOCATION");
-                 if (gpsPermission == PackageManager.PERMISSION_GRANTED) {
-                 location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
-                 } else if (networkPermission == PackageManager.PERMISSION_GRANTED) {
-                 location = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
-                 } else {
-                 location = locationManager.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER);
-                 }
-                 LatLng currentPosition = new LatLng(location.getLatitude(), location.getLongitude());
-                 options.add(currentPosition);
-                 **/
-                // mapboxMap.addPolyline(options);
-                // move the user's viewpoint to this position
-                /**
-
-                 **/
             }
         });
     }
@@ -140,10 +119,11 @@ public class Map extends AppCompatActivity implements MapboxMap.OnMyLocationChan
     @Override
     public void onMyLocationChange(@Nullable Location location) {
         if (location != null) {
-            double latitude = location.getLatitude();
-            double longitude = location.getLongitude();
-            options.add(new LatLng(latitude, longitude));
+            LatLng currentPosition = new LatLng(location.getLatitude(), location.getLongitude());
+            options.add(currentPosition);
+            double currentZoom = mapboxMap.getCameraPosition().zoom;
+            CameraPosition cameraPosition =  new CameraPosition.Builder().target(currentPosition).zoom(currentZoom).build();
+            mapboxMap.moveCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
         }
-        Toast.makeText(getApplicationContext(), "Hallo", Toast.LENGTH_LONG).show();
     }
 }
