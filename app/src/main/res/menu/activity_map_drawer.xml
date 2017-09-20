@@ -4,7 +4,7 @@
     <group android:checkableBehavior="single">
         <item
             android:id="@+id/Action1"
-            android:title="Action 1" />
+            android:title="GPS" />
         <item
             android:id="@+id/Action2"
             android:title="Action 2" />
