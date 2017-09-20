@@ -9,7 +9,6 @@ import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.NavigationView;
-import android.support.design.widget.Snackbar;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v4.view.GravityCompat;
@@ -31,13 +30,15 @@ import com.mapbox.mapboxsdk.maps.MapView;
 import com.mapbox.mapboxsdk.maps.MapboxMap;
 import com.mapbox.mapboxsdk.maps.OnMapReadyCallback;
 
-public class Map extends AppCompatActivity implements MapboxMap.OnMyLocationChangeListener, NavigationView.OnNavigationItemSelectedListener  {
+public class Map extends AppCompatActivity implements View.OnClickListener, MapboxMap.OnMyLocationChangeListener, NavigationView.OnNavigationItemSelectedListener {
 
     private MapView mapView;
     private FloatingActionButton floatingActionButton;
 
     private MapboxMap mapboxMap;
     private PolylineOptions options;
+
+    private boolean gpsTrackingEnabled;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -56,18 +57,12 @@ public class Map extends AppCompatActivity implements MapboxMap.OnMyLocationChan
         }
 
         FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
-        fab.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-                        .setAction("Action", null).show();
-            }
-        });
+        fab.setOnClickListener(Map.this);
 
         DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
         ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(
                 this, drawer, toolbar, R.string.navigation_drawer_open, R.string.navigation_drawer_close);
-        drawer.setDrawerListener(toggle);
+        drawer.addDrawerListener(toggle);
         toggle.syncState();
 
         NavigationView navigationView = (NavigationView) findViewById(R.id.nav_view);
@@ -207,6 +202,57 @@ public class Map extends AppCompatActivity implements MapboxMap.OnMyLocationChan
     }
 
     /**
+     * Get current location.
+     *
+     * @return current location as LatLng instance
+     */
+    private LatLng getCurrentLocation() {
+        Location myLocation = mapboxMap.getMyLocation();
+        LatLng currentPosition = new LatLng(myLocation.getLatitude(), myLocation.getLongitude());
+        return currentPosition;
+    }
+
+    /**
+     * Starts tracking of the GPS coordinates.
+     */
+    private void startNewRoute() {
+        LatLng currentPosition = getCurrentLocation();
+        // add current location as first point to the polyline
+        options = new PolylineOptions();
+        options.add(currentPosition);
+        mapboxMap.addPolyline(options);
+        // enable tracking
+        gpsTrackingEnabled = true;
+    }
+
+    /**
+     * Stops tracking of the GPS coordinates.
+     */
+    private void stopCurrentRoute() {
+        gpsTrackingEnabled = false;
+    }
+
+    /**
+     * Called when a view has been clicked.
+     *
+     * @param v The view that was clicked.
+     */
+    @Override
+    public void onClick(View v) {
+        switch (v.getId()) {
+            case R.id.fab:
+                if (gpsTrackingEnabled) {
+                    stopCurrentRoute();
+                } else {
+                    startNewRoute();
+                }
+                break;
+            default:
+                break;
+        }
+    }
+
+    /**
      * Called when the location of the My Location view has changed
      * (be it latitude/longitude, bearing or accuracy).
      *
@@ -214,12 +260,12 @@ public class Map extends AppCompatActivity implements MapboxMap.OnMyLocationChan
      */
     @Override
     public void onMyLocationChange(@Nullable Location location) {
-        if (location != null) {
+        if (gpsTrackingEnabled && location != null) {
             LatLng currentPosition = new LatLng(location.getLatitude(), location.getLongitude());
             options.add(currentPosition);
             double currentZoom = mapboxMap.getCameraPosition().zoom;
-            CameraPosition cameraPosition =  new CameraPosition.Builder().target(currentPosition).zoom(currentZoom).build();
-            mapboxMap.moveCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
+            CameraPosition cameraPosition = new CameraPosition.Builder().target(currentPosition).zoom(currentZoom).build();
+            mapboxMap.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition), 25000, null);
         }
     }
 }
