@@ -9,6 +9,7 @@ import android.support.design.widget.FloatingActionButton;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
+import android.widget.Toast;
 
 import com.mapbox.mapboxsdk.Mapbox;
 import com.mapbox.mapboxsdk.annotations.PolylineOptions;
@@ -56,7 +57,12 @@ public class Map extends AppCompatActivity implements MapboxMap.OnMyLocationChan
                 CameraPosition cameraPosition = new CameraPosition.Builder().target(currentPosition).zoom(16).build();
                 mapboxMap.setCameraPosition(cameraPosition);
                 mapboxMap.setOnMyLocationChangeListener(Map.this);
-
+                options = new PolylineOptions();
+                Location location = mapboxMap.getMyLocation();
+                double latitude = location.getLatitude();
+                double longitude = location.getLongitude();
+                options.add(new LatLng(latitude, longitude));
+                mapboxMap.addPolyline(options);
 
                 // options = new PolylineOptions();
                 /**
@@ -133,6 +139,11 @@ public class Map extends AppCompatActivity implements MapboxMap.OnMyLocationChan
      */
     @Override
     public void onMyLocationChange(@Nullable Location location) {
-
+        if (location != null) {
+            double latitude = location.getLatitude();
+            double longitude = location.getLongitude();
+            options.add(new LatLng(latitude, longitude));
+        }
+        Toast.makeText(getApplicationContext(), "Hallo", Toast.LENGTH_LONG).show();
     }
 }
