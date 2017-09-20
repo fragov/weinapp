@@ -20,7 +20,7 @@
             </intent-filter>
         </activity>
         <activity android:name=".Map" />
-        <activity android:name=".DB"></activity>
+        <activity android:name=".DB" />
     </application>
 
 </manifest>

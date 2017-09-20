@@ -12,4 +12,12 @@
         android:layout_height="match_parent"
         mapbox:mapbox_styleUrl="@string/mapbox_style_mapbox_streets" />
 
+    <android.support.design.widget.FloatingActionButton
+        android:id="@+id/fab"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:clickable="true"
+        mapbox:fabSize="mini"
+        mapbox:srcCompat="@android:drawable/ic_media_play" />
+
 </RelativeLayout>
