@@ -24,6 +24,7 @@ public class Map extends AppCompatActivity {
 
     private MapboxMap mapboxMap;
     private PolylineOptions options;
+    private MapboxMap.OnMyLocationChangeListener listener;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -54,6 +55,9 @@ public class Map extends AppCompatActivity {
                 LatLng currentPosition = new LatLng(myLocation.getLatitude(), myLocation.getLongitude());
                 CameraPosition cameraPosition = new CameraPosition.Builder().target(currentPosition).zoom(16).build();
                 mapboxMap.setCameraPosition(cameraPosition);
+                mapboxMap.setOnMyLocationChangeListener(listener);
+
+
 
                 // options = new PolylineOptions();
                 /**
