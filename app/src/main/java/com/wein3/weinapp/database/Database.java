@@ -4,12 +4,11 @@ import com.wein3.weinapp.Area;
 
 import java.util.HashMap;
 
-public interface Database {
+interface Database {
     /**
      * Initialise database
-     * @return status of initialisation
      */
-    boolean init();
+    void init();
 
     /**
      * Get list of available areas as HashMap of String ids and String descriptions
@@ -33,10 +32,9 @@ public interface Database {
 
     /**
      * Update existing area in database
-     * @param id ID of Area in database
      * @param area Area Object
      */
-    void updateArea(String id, Area area);
+    void updateArea(Area area);
 
     /**
      * Removes area from database
