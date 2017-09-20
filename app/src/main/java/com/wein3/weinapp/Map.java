@@ -18,7 +18,6 @@ import android.support.v7.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.view.Window;
 
 import com.mapbox.mapboxsdk.Mapbox;
 import com.mapbox.mapboxsdk.annotations.PolylineOptions;
@@ -43,7 +42,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         Mapbox.getInstance(this, getString(R.string.access_token));
-        requestWindowFeature(Window.FEATURE_ACTION_BAR_OVERLAY);
         setContentView(R.layout.activity_map);
 
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
@@ -74,7 +72,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
             }
         }
 
-        mapView = (MapView) findViewById(R.id.mapview);
+        mapView = (MapView) findViewById(R.id.mapView);
         mapView.onCreate(savedInstanceState);
         mapView.getMapAsync(new OnMapReadyCallback() {
             @Override
@@ -84,15 +82,10 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
                 mapboxMap.setMyLocationEnabled(true);
                 mapboxMap.setOnMyLocationChangeListener(Map.this);
                 // get current location
-                Location myLocation = mapboxMap.getMyLocation();
-                LatLng currentPosition = new LatLng(myLocation.getLatitude(), myLocation.getLongitude());
+                LatLng currentPosition = getCurrentLocation();
                 // move camera to current location
-                CameraPosition cameraPosition = new CameraPosition.Builder().target(currentPosition).build();
-                mapboxMap.moveCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
-                // add current location as first point to the polyline
-                options = new PolylineOptions();
-                options.add(currentPosition);
-                mapboxMap.addPolyline(options);
+                CameraPosition cameraPosition = new CameraPosition.Builder().target(currentPosition).zoom(16).build();
+                mapboxMap.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition), 25000, null);
             }
         });
     }
@@ -212,7 +205,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
      */
     private void startNewRoute() {
         LatLng currentPosition = getCurrentLocation();
-        // add current location as first point to the polyline
+        // create a new polyline starting at the current location
         options = new PolylineOptions();
         options.add(currentPosition);
         mapboxMap.addPolyline(options);
