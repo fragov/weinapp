@@ -20,7 +20,6 @@
             </intent-filter>
         </activity>
         <activity android:name=".Map" />
-        <activity android:name=".GPS" />
         <activity android:name=".DB"></activity>
     </application>
 

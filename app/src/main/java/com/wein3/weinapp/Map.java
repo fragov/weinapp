@@ -9,7 +9,6 @@ import android.os.Bundle;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
-import android.widget.Toast;
 
 import com.mapbox.mapboxsdk.Mapbox;
 import com.mapbox.mapboxsdk.annotations.PolylineOptions;
@@ -25,10 +24,6 @@ public class Map extends AppCompatActivity implements LocationListener {
 
     private MapView mapView;
     private PolylineOptions options;
-
-    private double latitude;
-    private double longitude;
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,14 +43,14 @@ public class Map extends AppCompatActivity implements LocationListener {
             }
         }
 
-        mapView = (MapView) findViewById(R.id.mapview);
+        mapView = (MapView) findViewById(R.id.mapView);
         mapView.onCreate(savedInstanceState);
-
         mapView.getMapAsync(new OnMapReadyCallback() {
             @Override
             public void onMapReady(MapboxMap mapboxMap) {
                 options = new PolylineOptions();
                 Location location;
+                // get the user's last known location as the first point of the polyline
                 int gpsPermission = getBaseContext().checkCallingOrSelfPermission("android.permission.ACCESS_FINE_LOCATION");
                 int networkPermission = getBaseContext().checkCallingOrSelfPermission("android.permission.ACCESS_COARSE_LOCATION");
                 if (gpsPermission == PackageManager.PERMISSION_GRANTED) {
@@ -65,13 +60,14 @@ public class Map extends AppCompatActivity implements LocationListener {
                 } else {
                     location = locationManager.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER);
                 }
-                options.add(new LatLng(location.getLatitude(), location.getLongitude()));
+                LatLng currentPosition = new LatLng(location.getLatitude(), location.getLongitude());
+                options.add(currentPosition);
                 mapboxMap.addPolyline(options);
+                // move the user's viewpoint to this position
+                CameraPosition cameraPosition = new CameraPosition.Builder().target(currentPosition).zoom(16).build();
+                mapboxMap.setCameraPosition(cameraPosition);
             }
         });
-
-        CameraPosition cameraPosition = new CameraPosition.Builder().target(new LatLng(41.327752, 41.327752)).zoom(13).build();
-
     }
 
     @Override
@@ -81,11 +77,11 @@ public class Map extends AppCompatActivity implements LocationListener {
         int gpsPermission = getBaseContext().checkCallingOrSelfPermission("android.permission.ACCESS_FINE_LOCATION");
         int networkPermission = getBaseContext().checkCallingOrSelfPermission("android.permission.ACCESS_COARSE_LOCATION");
         if (gpsPermission == PackageManager.PERMISSION_GRANTED) {
-            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 10000, 0, this);
+            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 5000, 0, this);
         } else if (networkPermission == PackageManager.PERMISSION_GRANTED) {
-            locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 10000, 0, this);
+            locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 5000, 0, this);
         } else {
-            locationManager.requestLocationUpdates(LocationManager.PASSIVE_PROVIDER, 10000, 0, this);
+            locationManager.requestLocationUpdates(LocationManager.PASSIVE_PROVIDER, 5000, 0, this);
         }
     }
 
@@ -109,9 +105,9 @@ public class Map extends AppCompatActivity implements LocationListener {
     }
 
     @Override
-    public void onSaveInstanceState(Bundle outState) {
-        super.onSaveInstanceState(outState);
-        mapView.onSaveInstanceState(outState);
+    protected void onDestroy() {
+        super.onDestroy();
+        mapView.onDestroy();
     }
 
     @Override
@@ -121,32 +117,62 @@ public class Map extends AppCompatActivity implements LocationListener {
     }
 
     @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        mapView.onDestroy();
+    public void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        mapView.onSaveInstanceState(outState);
     }
 
+    // ### methods provided by the LocationListener interface ###
 
+    /**
+     * Called when the location has changed.
+     *
+     * @param location The new location, as a Location object.
+     */
     @Override
     public void onLocationChanged(Location location) {
         if (location != null) {
-            latitude = location.getLatitude();
-            longitude = location.getLongitude();
+            LatLng newPosition = new LatLng(location.getLatitude(), location.getLongitude());
+            options.add(newPosition);
         }
-        options.add(new LatLng(latitude, longitude));
-        Toast.makeText(getApplicationContext(), "" + latitude + ", " + longitude, Toast.LENGTH_SHORT).show();
     }
 
+    /**
+     * Called when the provider status changes.
+     *
+     * @param provider the name of the location provider associated with this
+     *                 update.
+     * @param status   LocationProvider.OUT_OF_SERVICE if the
+     *                 provider is out of service, and this is not expected to change in the
+     *                 near future; LocationProvider.TEMPORARILY_UNAVAILABLE if
+     *                 the provider is temporarily unavailable but is expected to be available
+     *                 shortly; and LocationProvider.AVAILABLE if the
+     *                 provider is currently available.
+     * @param extras   an optional Bundle which will contain provider specific
+     *                 status variables.
+     */
     @Override
     public void onStatusChanged(String provider, int status, Bundle extras) {
 
     }
 
+    /**
+     * Called when the provider is enabled by the user.
+     *
+     * @param provider the name of the location provider associated with this
+     *                 update.
+     */
     @Override
     public void onProviderEnabled(String provider) {
 
     }
 
+    /**
+     * Called when the provider is disabled by the user.
+     *
+     * @param provider the name of the location provider associated with this
+     *                 update.
+     */
     @Override
     public void onProviderDisabled(String provider) {
 
