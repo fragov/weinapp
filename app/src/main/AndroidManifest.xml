@@ -21,6 +21,7 @@
         </activity>
         <activity android:name=".Map" />
         <activity android:name=".DB" />
+        <activity android:name=".GPS"></activity>
     </application>
 
 </manifest>
