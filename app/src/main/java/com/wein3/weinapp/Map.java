@@ -4,6 +4,7 @@ import android.Manifest;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Bundle;
+import android.support.annotation.Nullable;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
@@ -17,14 +18,13 @@ import com.mapbox.mapboxsdk.maps.MapView;
 import com.mapbox.mapboxsdk.maps.MapboxMap;
 import com.mapbox.mapboxsdk.maps.OnMapReadyCallback;
 
-public class Map extends AppCompatActivity {
+public class Map extends AppCompatActivity implements MapboxMap.OnMyLocationChangeListener {
 
     private MapView mapView;
     private FloatingActionButton floatingActionButton;
 
     private MapboxMap mapboxMap;
     private PolylineOptions options;
-    private MapboxMap.OnMyLocationChangeListener listener;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -55,8 +55,7 @@ public class Map extends AppCompatActivity {
                 LatLng currentPosition = new LatLng(myLocation.getLatitude(), myLocation.getLongitude());
                 CameraPosition cameraPosition = new CameraPosition.Builder().target(currentPosition).zoom(16).build();
                 mapboxMap.setCameraPosition(cameraPosition);
-                mapboxMap.setOnMyLocationChangeListener(listener);
-
+                mapboxMap.setOnMyLocationChangeListener(Map.this);
 
 
                 // options = new PolylineOptions();
@@ -124,5 +123,16 @@ public class Map extends AppCompatActivity {
     public void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
         mapView.onSaveInstanceState(outState);
+    }
+
+    /**
+     * Called when the location of the My Location view has changed
+     * (be it latitude/longitude, bearing or accuracy).
+     *
+     * @param location The current location of the My Location view The type of map change event.
+     */
+    @Override
+    public void onMyLocationChange(@Nullable Location location) {
+
     }
 }
