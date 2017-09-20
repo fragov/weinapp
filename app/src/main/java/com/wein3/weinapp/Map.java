@@ -79,6 +79,9 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
             public void onMapReady(MapboxMap mbMap) {
                 // initialize map
                 mapboxMap = mbMap;
+                mapboxMap.getUiSettings().setCompassMargins(mapboxMap.getUiSettings().getCompassMarginLeft(),
+                        mapboxMap.getUiSettings().getCompassMarginTop()+80, mapboxMap.getUiSettings().getCompassMarginRight(),
+                        mapboxMap.getUiSettings().getCompassMarginBottom()-80);
                 mapboxMap.setMyLocationEnabled(true);
                 mapboxMap.setOnMyLocationChangeListener(Map.this);
                 // get current location
