@@ -5,4 +5,7 @@
     <usb-device vendor-id="067B" product-id="1234" class="255" subclass="66" protocol="1"/>
     -->
     <usb-device vendor-id="067B" product-id="8963"/>
+    <!--
+    <usb-device vendor-id="067B" product-id="2303"/>
+    -->
 </resources>
