@@ -21,10 +21,11 @@ import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.ActionBarDrawerToggle;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
+import android.util.DisplayMetrics;
+import android.view.Display;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.view.Window;
 import android.widget.Toast;
 
 import com.mapbox.mapboxsdk.Mapbox;
@@ -46,6 +47,8 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
     private MapboxMap mapboxMap;
     private PolylineOptions options;
     Location myLocation;
+    public static float dpWidth;
+    public static float dpHeight;
 
     private boolean pathTrackingEnabled;
 
@@ -64,7 +67,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
         floatingActionButton = (FloatingActionButton) findViewById(R.id.fab);
         floatingActionButton.setOnClickListener(this);
         floatingActionButton.setImageResource(R.drawable.ic_record);
-
 
         fabLocation = (FloatingActionButton) findViewById(R.id.fabLoc);
         fabLocation.setOnClickListener(this);
@@ -93,6 +95,13 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
         mapView = (MapView) findViewById(R.id.mapView);
         mapView.onCreate(savedInstanceState);
 
+        Display display = getWindowManager().getDefaultDisplay();
+        DisplayMetrics outMetrics = new DisplayMetrics ();
+        display.getMetrics(outMetrics);
+
+        float density  = getResources().getDisplayMetrics().density;
+        dpHeight = outMetrics.heightPixels / density;
+        dpWidth  = outMetrics.widthPixels / density;
     }
 
     @Override
@@ -136,7 +145,8 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
             Intent intent = new Intent(Map.this, GPS.class);
             startActivity(intent);
         } else if (id == R.id.Action2) {
-
+            Intent intent = new Intent(Map.this, DB.class);
+            startActivity(intent);
         } else if (id == R.id.Action3) {
 
         } else if (id == R.id.Action4) {
@@ -168,11 +178,8 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
                 mapboxMap = mbMap;
                 // move compass on Mapbox map
                 int compassShift = 80;
-                mapboxMap.getUiSettings().setCompassMargins(
-                        mapboxMap.getUiSettings().getCompassMarginLeft(),
-                        mapboxMap.getUiSettings().getCompassMarginTop() + compassShift,
-                        mapboxMap.getUiSettings().getCompassMarginRight(),
-                        mapboxMap.getUiSettings().getCompassMarginBottom() - compassShift);
+                mapboxMap.getUiSettings().setCompassMargins(mapboxMap.getUiSettings().getCompassMarginLeft(),
+                        compassShift, mapboxMap.getUiSettings().getCompassMarginRight(), (int)dpHeight - compassShift);
                 // get the current location only if GPS is enabled
                 final LocationManager manager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
                 if (!manager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {

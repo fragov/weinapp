@@ -7,7 +7,7 @@
             android:title="GPS" />
         <item
             android:id="@+id/Action2"
-            android:title="Action 2" />
+            android:title="Data" />
         <item
             android:id="@+id/Action3"
             android:title="Action 3" />

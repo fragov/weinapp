@@ -11,4 +11,7 @@
     <string name="gps_disabled_message">Das GPS ist ausgeschaltet. Ohne GPS-Empfang sind nicht alle Funktionen verfügbar. GPS anschalten?</string>
     <string name="gps_disabled_button_yes">GPS anschalten</string>
     <string name="gps_disabled_button_no">Weiter ohne GPS</string>
+
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
 </resources>
