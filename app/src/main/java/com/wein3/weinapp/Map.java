@@ -63,6 +63,8 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
 
         floatingActionButton = (FloatingActionButton) findViewById(R.id.fab);
         floatingActionButton.setOnClickListener(this);
+        floatingActionButton.setImageResource(R.drawable.ic_record);
+
 
         fabLocation = (FloatingActionButton) findViewById(R.id.fabLoc);
         fabLocation.setOnClickListener(this);
@@ -264,6 +266,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
      * Starts printing the GPS coordinates onto the map.
      */
     private void startNewRoute() {
+        floatingActionButton.setImageResource(R.drawable.ic_stop);
         // initialize a new polyline
         options = new PolylineOptions();
         // add current location as first point to the polyline
@@ -281,6 +284,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
      * Stops tracking of the GPS coordinates.
      */
     private void stopCurrentRoute() {
+        floatingActionButton.setImageResource(R.drawable.ic_record);
         pathTrackingEnabled = false;
     }
 
