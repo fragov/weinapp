@@ -43,6 +43,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
 
     private MapView mapView;
     private FloatingActionButton floatingActionButton;
+    private FloatingActionButton fabLocation;
 
     private MapboxMap mapboxMap;
     private PolylineOptions options;
@@ -61,7 +62,10 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
         getSupportActionBar().setDisplayShowTitleEnabled(false);
 
         floatingActionButton = (FloatingActionButton) findViewById(R.id.fab);
-        floatingActionButton.setOnClickListener(Map.this);
+        floatingActionButton.setOnClickListener(this);
+
+        fabLocation = (FloatingActionButton) findViewById(R.id.fabLoc);
+        fabLocation.setOnClickListener(this);
 
         DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
         ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(
@@ -115,10 +119,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
                 }
             }
         });
-
-
-
-
     }
 
     @Override
@@ -268,6 +268,9 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
                 } else {
                     startNewRoute();
                 }
+                break;
+            case R.id.fabLoc:
+                //TODO
                 break;
             default:
                 break;
