@@ -90,35 +90,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
 
         mapView = (MapView) findViewById(R.id.mapView);
         mapView.onCreate(savedInstanceState);
-        mapView.getMapAsync(new OnMapReadyCallback() {
-            @Override
-            public void onMapReady(MapboxMap mbMap) {
-                // get Mapbox map instance
-                mapboxMap = mbMap;
-                // move compass on Mapbox map
-                int compassShift = 80;
-                mapboxMap.getUiSettings().setCompassMargins(
-                        mapboxMap.getUiSettings().getCompassMarginLeft(),
-                        mapboxMap.getUiSettings().getCompassMarginTop() + compassShift,
-                        mapboxMap.getUiSettings().getCompassMarginRight(),
-                        mapboxMap.getUiSettings().getCompassMarginBottom() - compassShift);
-                // get the current location only if GPS is enabled
-                final LocationManager manager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-                if (!manager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-                    showGPSDisabledDialog();
-                } else {
-                    // initialize Mapbox map
-                    mapboxMap.setMyLocationEnabled(true);
-                    // set listener for future location changes
-                    mapboxMap.setOnMyLocationChangeListener(Map.this);
-                    // get current location
-                    LatLng currentPosition = getCurrentLocation();
-                    // move camera to current position
-                    CameraPosition cameraPosition = new CameraPosition.Builder().target(currentPosition).zoom(16).build();
-                    mapboxMap.setCameraPosition(cameraPosition);
-                }
-            }
-        });
+
     }
 
     @Override
@@ -190,36 +162,35 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
         mapView.getMapAsync(new OnMapReadyCallback() {
             @Override
             public void onMapReady(MapboxMap mbMap) {
+                // get Mapbox map instance
                 mapboxMap = mbMap;
+                // move compass on Mapbox map
+                int compassShift = 80;
+                mapboxMap.getUiSettings().setCompassMargins(
+                        mapboxMap.getUiSettings().getCompassMarginLeft(),
+                        mapboxMap.getUiSettings().getCompassMarginTop() + compassShift,
+                        mapboxMap.getUiSettings().getCompassMarginRight(),
+                        mapboxMap.getUiSettings().getCompassMarginBottom() - compassShift);
+                // get the current location only if GPS is enabled
                 final LocationManager manager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-                // get current location
-                mapboxMap.getUiSettings().setCompassMargins(mapboxMap.getUiSettings().getCompassMarginLeft(),
-                        mapboxMap.getUiSettings().getCompassMarginTop()+80, mapboxMap.getUiSettings().getCompassMarginRight(),
-                        mapboxMap.getUiSettings().getCompassMarginBottom()-80);
-                mapboxMap.setMyLocationEnabled(true);
-                myLocation = mapboxMap.getMyLocation();
-                if (!manager.isProviderEnabled( LocationManager.GPS_PROVIDER ) ) {
+                if (!manager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
                     showGPSDisabledDialog();
-
-                }
-                else {
-                    // initialize map
+                } else {
+                    // initialize Mapbox map
+                    mapboxMap.setMyLocationEnabled(true);
+                    // set listener for future location changes
                     mapboxMap.setOnMyLocationChangeListener(Map.this);
+                    // get current location
                     if(myLocation != null) {
+                        Location myLocation = mapboxMap.getMyLocation();
                         LatLng currentPosition = new LatLng(myLocation.getLatitude(), myLocation.getLongitude());
-                        // move camera to current location
+                        // move camera to current position
                         CameraPosition cameraPosition = new CameraPosition.Builder().target(currentPosition).zoom(16).build();
-                        mapboxMap.moveCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
-                        // add current location as first point to the polyline
-                        options = new PolylineOptions();
-                        options.add(currentPosition);
+                        mapboxMap.setCameraPosition(cameraPosition);
                     }
-                    //mapboxMap.addPolyline(options);
-
                 }
             }
         });
-
     }
 
     @Override
@@ -360,7 +331,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
     @Override
     public void onMyLocationChange(@Nullable Location location) {
         myLocation = location;
-        if (gpsTrackingEnabled && location != null) {
         if (pathTrackingEnabled && location != null) {
             LatLng currentPosition = new LatLng(location.getLatitude(), location.getLongitude());
             options.add(currentPosition);
