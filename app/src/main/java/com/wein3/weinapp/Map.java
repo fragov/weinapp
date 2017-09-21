@@ -5,11 +5,9 @@ import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.location.Location;
-import android.os.Build;
 import android.location.LocationManager;
 import android.os.Bundle;
 import android.provider.Settings;
@@ -49,13 +47,15 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
     private PolylineOptions options;
     Location myLocation;
 
-    private boolean gpsTrackingEnabled;
+    private boolean pathTrackingEnabled;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         Mapbox.getInstance(this, getString(R.string.access_token));
         setContentView(R.layout.activity_map);
+
+        pathTrackingEnabled = false;
 
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
@@ -76,7 +76,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
         NavigationView navigationView = (NavigationView) findViewById(R.id.nav_view);
         navigationView.setNavigationItemSelectedListener(this);
 
-        // request permissions
+        // request necessary location permissions
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             if (!ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_COARSE_LOCATION)) {
                 ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, 1);
@@ -87,10 +87,38 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
                 ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
             }
         }
+
         mapView = (MapView) findViewById(R.id.mapView);
         mapView.onCreate(savedInstanceState);
-
-
+        mapView.getMapAsync(new OnMapReadyCallback() {
+            @Override
+            public void onMapReady(MapboxMap mbMap) {
+                // get Mapbox map instance
+                mapboxMap = mbMap;
+                // move compass on Mapbox map
+                int compassShift = 80;
+                mapboxMap.getUiSettings().setCompassMargins(
+                        mapboxMap.getUiSettings().getCompassMarginLeft(),
+                        mapboxMap.getUiSettings().getCompassMarginTop() + compassShift,
+                        mapboxMap.getUiSettings().getCompassMarginRight(),
+                        mapboxMap.getUiSettings().getCompassMarginBottom() - compassShift);
+                // get the current location only if GPS is enabled
+                final LocationManager manager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+                if (!manager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                    showGPSDisabledDialog();
+                } else {
+                    // initialize Mapbox map
+                    mapboxMap.setMyLocationEnabled(true);
+                    // set listener for future location changes
+                    mapboxMap.setOnMyLocationChangeListener(Map.this);
+                    // get current location
+                    LatLng currentPosition = getCurrentLocation();
+                    // move camera to current position
+                    CameraPosition cameraPosition = new CameraPosition.Builder().target(currentPosition).zoom(16).build();
+                    mapboxMap.setCameraPosition(cameraPosition);
+                }
+            }
+        });
     }
 
     @Override
@@ -144,7 +172,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
         } else if (id == R.id.nav_send) {
 
         }
-
         DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
         drawer.closeDrawer(GravityCompat.START);
         return true;
@@ -229,6 +256,29 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
     }
 
     /**
+     * Show dialog to enable GPS.
+     */
+    private void showGPSDisabledDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle(R.string.gps_disabled_title);
+        builder.setMessage(R.string.gps_disabled_message);
+        builder.setPositiveButton(R.string.gps_disabled_button_yes, new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                startActivity(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS));
+            }
+        });
+        builder.setNegativeButton(R.string.gps_disabled_button_no, new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+
+            }
+        });
+        builder.create();
+        builder.show();
+    }
+
+    /**
      * Get current location.
      *
      * @return current location as LatLng instance
@@ -240,25 +290,27 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
     }
 
     /**
-     * Starts tracking of the GPS coordinates.
+     * Starts printing the GPS coordinates onto the map.
      */
     private void startNewRoute() {
-        LatLng currentPosition = getCurrentLocation();
-        // create a new polyline starting at the current location
+        // initialize a new polyline
         options = new PolylineOptions();
+        // add current location as first point to the polyline
+        LatLng currentPosition = getCurrentLocation();
         options.add(currentPosition);
-        Polyline line = mapboxMap.addPolyline(options);
-        line.setColor(Color.RED);
-        line.setWidth(3);
-        // enable tracking
-        gpsTrackingEnabled = true;
+        // add polyline to the map
+        Polyline polyline = mapboxMap.addPolyline(options);
+        polyline.setColor(Color.RED);
+        polyline.setWidth(3);
+        // enable further GPS tracking
+        pathTrackingEnabled = true;
     }
 
     /**
      * Stops tracking of the GPS coordinates.
      */
     private void stopCurrentRoute() {
-        gpsTrackingEnabled = false;
+        pathTrackingEnabled = false;
     }
 
     /**
@@ -270,7 +322,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
     public void onClick(View v) {
         switch (v.getId()) {
             case R.id.fab:
-                if (gpsTrackingEnabled) {
+                if (pathTrackingEnabled) {
                     stopCurrentRoute();
                 } else {
                     startNewRoute();
@@ -309,32 +361,12 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
     public void onMyLocationChange(@Nullable Location location) {
         myLocation = location;
         if (gpsTrackingEnabled && location != null) {
+        if (pathTrackingEnabled && location != null) {
             LatLng currentPosition = new LatLng(location.getLatitude(), location.getLongitude());
             options.add(currentPosition);
             double currentZoom = mapboxMap.getCameraPosition().zoom;
             CameraPosition cameraPosition = new CameraPosition.Builder().target(currentPosition).zoom(currentZoom).build();
-            mapboxMap.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition), 25000, null);
+            mapboxMap.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition), 1000, null);
         }
-    }
-
-    public void showGPSDisabledDialog() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("GPS ist aus!");
-        builder.setMessage("Gps ist ausgeschaltet. Es sind nicht alle Funktionen ohne GPS verfügbar. GPS anschalten?");
-        builder.setPositiveButton("GPS anschalten", new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-
-                startActivity(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS));
-
-            }
-        }).setNegativeButton("Weiter ohne GPS", new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-
-            }
-        });
-        builder.create();
-        builder.show();
     }
 }
