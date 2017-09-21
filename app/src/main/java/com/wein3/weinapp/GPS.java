@@ -10,9 +10,12 @@ import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbEndpoint;
 import android.hardware.usb.UsbInterface;
 import android.hardware.usb.UsbManager;
+import android.support.annotation.NonNull;
+import android.support.design.widget.NavigationView;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
@@ -25,7 +28,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Set;
 
-public class GPS extends AppCompatActivity {
+public class GPS extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener {
 
     private static final String LCDT = "LogCatDemoTag";
 
@@ -313,5 +316,16 @@ public class GPS extends AppCompatActivity {
         }
 
         return b;
+    }
+
+    /**
+     * Called when an item in the navigation menu is selected.
+     *
+     * @param item The selected item
+     * @return true to display the item as the selected item
+     */
+    @Override
+    public boolean onNavigationItemSelected(@NonNull MenuItem item) {
+        return false;
     }
 }

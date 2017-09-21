@@ -38,19 +38,21 @@ import com.mapbox.mapboxsdk.maps.MapView;
 import com.mapbox.mapboxsdk.maps.MapboxMap;
 import com.mapbox.mapboxsdk.maps.OnMapReadyCallback;
 
-public class Map extends AppCompatActivity implements View.OnClickListener, MapboxMap.OnMyLocationChangeListener, NavigationView.OnNavigationItemSelectedListener {
+public class Map extends AppCompatActivity implements View.OnClickListener, NavigationView.OnNavigationItemSelectedListener, MapboxMap.OnMyLocationChangeListener {
 
     private MapView mapView;
-    private FloatingActionButton floatingActionButton;
     private FloatingActionButton fabLocation;
+    private FloatingActionButton fabPath;
 
     private MapboxMap mapboxMap;
     private PolylineOptions options;
-    Location myLocation;
-    public static float dpWidth;
-    public static float dpHeight;
+
+    private LocationManager locationManager;
+
+    private double defaultZoom;
 
     private boolean pathTrackingEnabled;
+    private float displayHeight;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -58,17 +60,23 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
         Mapbox.getInstance(this, getString(R.string.access_token));
         setContentView(R.layout.activity_map);
 
+        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+
+        // set global attributes
+        defaultZoom = 16;
+
+        // set status variables
         pathTrackingEnabled = false;
 
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         getSupportActionBar().setDisplayShowTitleEnabled(false);
 
-        floatingActionButton = (FloatingActionButton) findViewById(R.id.fab);
-        floatingActionButton.setOnClickListener(this);
-        floatingActionButton.setImageResource(R.drawable.ic_record);
+        fabPath = (FloatingActionButton) findViewById(R.id.fabPath);
+        fabPath.setImageResource(R.drawable.ic_record);
+        fabPath.setOnClickListener(this);
 
-        fabLocation = (FloatingActionButton) findViewById(R.id.fabLoc);
+        fabLocation = (FloatingActionButton) findViewById(R.id.fabLocation);
         fabLocation.setOnClickListener(this);
 
         DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
@@ -96,12 +104,42 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
         mapView.onCreate(savedInstanceState);
 
         Display display = getWindowManager().getDefaultDisplay();
-        DisplayMetrics outMetrics = new DisplayMetrics ();
+        DisplayMetrics outMetrics = new DisplayMetrics();
         display.getMetrics(outMetrics);
 
-        float density  = getResources().getDisplayMetrics().density;
-        dpHeight = outMetrics.heightPixels / density;
-        dpWidth  = outMetrics.widthPixels / density;
+        float density = getResources().getDisplayMetrics().density;
+        displayHeight = outMetrics.heightPixels / density;
+
+        mapView.getMapAsync(new OnMapReadyCallback() {
+            @Override
+            public void onMapReady(MapboxMap mbMap) {
+                // get Mapbox map instance
+                mapboxMap = mbMap;
+                // move compass on Mapbox map
+                int compassShift = 80;
+                mapboxMap.getUiSettings().setCompassMargins(mapboxMap.getUiSettings().getCompassMarginLeft(),
+                        compassShift, mapboxMap.getUiSettings().getCompassMarginRight(), (int) displayHeight - compassShift);
+                // get the current location only if GPS is enabled
+                if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                    // initialize Mapbox map
+                    mapboxMap.setMyLocationEnabled(true);
+                    // set listener for future location changes
+                    mapboxMap.setOnMyLocationChangeListener(Map.this);
+                    // set camera to current location
+                    Location location = mapboxMap.getMyLocation();
+                    if (location != null) {
+                        // move camera to current position
+                        CameraPosition cameraPosition = new CameraPosition.Builder().target(getLatLng(location)).zoom(defaultZoom).build();
+                        mapboxMap.setCameraPosition(cameraPosition);
+                    } else {
+                        // move camera to default position
+                        mapboxMap.setCameraPosition(CameraPosition.DEFAULT);
+                    }
+                } else {
+                    showGPSDisabledDialog();
+                }
+            }
+        });
     }
 
     @Override
@@ -136,31 +174,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
         return super.onOptionsItemSelected(item);
     }
 
-    @SuppressWarnings("StatementWithEmptyBody")
-    public boolean onNavigationItemSelected(MenuItem item) {
-        // Handle navigation view item clicks here.
-        int id = item.getItemId();
-
-        if (id == R.id.Action1) {
-            Intent intent = new Intent(Map.this, GPS.class);
-            startActivity(intent);
-        } else if (id == R.id.Action2) {
-            Intent intent = new Intent(Map.this, DB.class);
-            startActivity(intent);
-        } else if (id == R.id.Action3) {
-
-        } else if (id == R.id.Action4) {
-
-        } else if (id == R.id.nav_share) {
-
-        } else if (id == R.id.nav_send) {
-
-        }
-        DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
-        drawer.closeDrawer(GravityCompat.START);
-        return true;
-    }
-
     @Override
     public void onStart() {
         super.onStart();
@@ -171,44 +184,12 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
     public void onResume() {
         super.onResume();
         mapView.onResume();
-        mapView.getMapAsync(new OnMapReadyCallback() {
-            @Override
-            public void onMapReady(MapboxMap mbMap) {
-                // get Mapbox map instance
-                mapboxMap = mbMap;
-                // move compass on Mapbox map
-                int compassShift = 80;
-                mapboxMap.getUiSettings().setCompassMargins(mapboxMap.getUiSettings().getCompassMarginLeft(),
-                        compassShift, mapboxMap.getUiSettings().getCompassMarginRight(), (int)dpHeight - compassShift);
-                // get the current location only if GPS is enabled
-                final LocationManager manager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-                if (!manager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-                    showGPSDisabledDialog();
-                } else {
-                    // initialize Mapbox map
-                    mapboxMap.setMyLocationEnabled(true);
-                    // set listener for future location changes
-                    mapboxMap.setOnMyLocationChangeListener(Map.this);
-                    // get current location
-                    if(myLocation != null) {
-                        Location myLocation = mapboxMap.getMyLocation();
-                        LatLng currentPosition = new LatLng(myLocation.getLatitude(), myLocation.getLongitude());
-                        // move camera to current position
-                        CameraPosition cameraPosition = new CameraPosition.Builder().target(currentPosition).zoom(16).build();
-                        mapboxMap.setCameraPosition(cameraPosition);
-                    }
-                }
-            }
-        });
     }
 
     @Override
     public void onPause() {
         super.onPause();
         mapView.onPause();
-        //mapboxMap.setMyLocationEnabled(true);
-        //Location loc = mapboxMap.getMyLocation();
-
     }
 
     @Override
@@ -240,15 +221,15 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
      */
     private void showGPSDisabledDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle(R.string.gps_disabled_title);
-        builder.setMessage(R.string.gps_disabled_message);
-        builder.setPositiveButton(R.string.gps_disabled_button_yes, new DialogInterface.OnClickListener() {
+        builder.setTitle(R.string.gps_disabled_dialog_title);
+        builder.setMessage(R.string.gps_disabled_dialog_message);
+        builder.setPositiveButton(R.string.gps_disabled_dialog_button_yes, new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
                 startActivity(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS));
             }
         });
-        builder.setNegativeButton(R.string.gps_disabled_button_no, new DialogInterface.OnClickListener() {
+        builder.setNegativeButton(R.string.gps_disabled_dialog_button_no, new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
 
@@ -259,25 +240,52 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
     }
 
     /**
-     * Get current location.
+     * Get current position on the map.
      *
      * @return current location as LatLng instance
      */
-    private LatLng getCurrentLocation() {
-        Location myLocation = mapboxMap.getMyLocation();
-        LatLng currentPosition = new LatLng(myLocation.getLatitude(), myLocation.getLongitude());
+    private LatLng getCurrentPosition() {
+        Location location = mapboxMap.getMyLocation();
+        LatLng currentPosition = getLatLng(location);
         return currentPosition;
+    }
+
+    /**
+     * Convert Location to LatLng.
+     *
+     * @param location current location as Location instance
+     * @return current location as LatLng instance
+     */
+    private LatLng getLatLng(final Location location) {
+        LatLng position = new LatLng(location.getLatitude(), location.getLongitude());
+        return position;
+    }
+
+    /**
+     * Move camera view to current location (with animation).
+     */
+    private void moveCamera(final Location location) {
+        LatLng currentPosition = getLatLng(location);
+        moveCamera(currentPosition);
+    }
+
+    /**
+     * Move camera view to current location (with animation).
+     */
+    private void moveCamera(final LatLng position) {
+        double currentZoom = mapboxMap.getCameraPosition().zoom;
+        CameraPosition cameraPosition = new CameraPosition.Builder().target(position).zoom(currentZoom).build();
+        mapboxMap.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
     }
 
     /**
      * Starts printing the GPS coordinates onto the map.
      */
     private void startNewRoute() {
-        floatingActionButton.setImageResource(R.drawable.ic_stop);
         // initialize a new polyline
         options = new PolylineOptions();
         // add current location as first point to the polyline
-        LatLng currentPosition = getCurrentLocation();
+        LatLng currentPosition = getCurrentPosition();
         options.add(currentPosition);
         // add polyline to the map
         Polyline polyline = mapboxMap.addPolyline(options);
@@ -285,14 +293,18 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
         polyline.setWidth(3);
         // enable further GPS tracking
         pathTrackingEnabled = true;
+        // set another icon while recording
+        fabPath.setImageResource(R.drawable.ic_stop);
     }
 
     /**
      * Stops tracking of the GPS coordinates.
      */
     private void stopCurrentRoute() {
-        floatingActionButton.setImageResource(R.drawable.ic_record);
+        // disable further GPS tracking
         pathTrackingEnabled = false;
+        // reset the original icon
+        fabPath.setImageResource(R.drawable.ic_record);
     }
 
     /**
@@ -303,34 +315,60 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
     @Override
     public void onClick(View v) {
         switch (v.getId()) {
-            case R.id.fab:
+            case R.id.fabPath:
                 if (pathTrackingEnabled) {
                     stopCurrentRoute();
                 } else {
                     startNewRoute();
                 }
                 break;
-            case R.id.fabLoc:
+            case R.id.fabLocation:
                 final LocationManager manager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-                if (manager.isProviderEnabled( LocationManager.GPS_PROVIDER ) ) {
-
-                    if(myLocation!=null) {
-                        LatLng currentPosition = new LatLng(myLocation.getLatitude(), myLocation.getLongitude());
-                        CameraPosition cameraPosition = new CameraPosition.Builder().target(currentPosition).zoom(16).build();
-                        mapboxMap.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition), 3000);
+                if (manager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                    Location location = mapboxMap.getMyLocation();
+                    if (location != null) {
+                        moveCamera(location);
+                    } else {
+                        Toast.makeText(Map.this, R.string.gps_not_available, Toast.LENGTH_SHORT).show();
                     }
-                    else{
-                        Toast.makeText(Map.this, "Komme nicht an GPS Daten ran", Toast.LENGTH_LONG).show();
-                    }
-
-                }
-                else{
-                    Toast.makeText(Map.this, "GPS nicht verfügbar", Toast.LENGTH_LONG).show();
+                } else {
+                    Toast.makeText(Map.this, R.string.gps_turned_off, Toast.LENGTH_SHORT).show();
                 }
                 break;
             default:
                 break;
         }
+    }
+
+    /**
+     * Called when an item in the navigation menu is selected.
+     *
+     * @param item The selected item
+     * @return true to display the item as the selected item
+     */
+    @Override
+    public boolean onNavigationItemSelected(MenuItem item) {
+        // Handle navigation view item clicks here.
+        int id = item.getItemId();
+
+        if (id == R.id.Action1) {
+            Intent intent = new Intent(Map.this, GPS.class);
+            startActivity(intent);
+        } else if (id == R.id.Action2) {
+            Intent intent = new Intent(Map.this, DB.class);
+            startActivity(intent);
+        } else if (id == R.id.Action3) {
+
+        } else if (id == R.id.Action4) {
+
+        } else if (id == R.id.nav_share) {
+
+        } else if (id == R.id.nav_send) {
+
+        }
+        DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
+        drawer.closeDrawer(GravityCompat.START);
+        return true;
     }
 
     /**
@@ -341,13 +379,10 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
      */
     @Override
     public void onMyLocationChange(@Nullable Location location) {
-        myLocation = location;
         if (pathTrackingEnabled && location != null) {
-            LatLng currentPosition = new LatLng(location.getLatitude(), location.getLongitude());
+            LatLng currentPosition = getLatLng(location);
             options.add(currentPosition);
-            double currentZoom = mapboxMap.getCameraPosition().zoom;
-            CameraPosition cameraPosition = new CameraPosition.Builder().target(currentPosition).zoom(currentZoom).build();
-            mapboxMap.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition), 1000, null);
+            moveCamera(currentPosition);
         }
     }
 }

@@ -7,10 +7,14 @@
     <string name="navigation_drawer_close">Close navigation drawer</string>
 
     <!-- GPS disabled dialog -->
-    <string name="gps_disabled_title">GPS ist aus!</string>
-    <string name="gps_disabled_message">Das GPS ist ausgeschaltet. Ohne GPS-Empfang sind nicht alle Funktionen verfügbar. GPS anschalten?</string>
-    <string name="gps_disabled_button_yes">GPS anschalten</string>
-    <string name="gps_disabled_button_no">Weiter ohne GPS</string>
+    <string name="gps_disabled_dialog_title">GPS ist aus!</string>
+    <string name="gps_disabled_dialog_message">Das GPS ist ausgeschaltet. Ohne GPS-Empfang sind nicht alle Funktionen verfügbar. GPS anschalten?</string>
+    <string name="gps_disabled_dialog_button_yes">GPS anschalten</string>
+    <string name="gps_disabled_dialog_button_no">Weiter ohne GPS</string>
+
+    <!-- GPS warnings -->
+    <string name="gps_not_available">GPS ist aktuell nicht verfügbar</string>
+    <string name="gps_turned_off">GPS ist ausgeschaltet</string>
 
     <!-- TODO: Remove or change this placeholder text -->
     <string name="hello_blank_fragment">Hello blank fragment</string>
