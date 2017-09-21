@@ -7,6 +7,7 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.location.Location;
 import android.os.Build;
 import android.location.LocationManager;
@@ -29,6 +30,7 @@ import android.view.Window;
 import android.widget.Toast;
 
 import com.mapbox.mapboxsdk.Mapbox;
+import com.mapbox.mapboxsdk.annotations.Polyline;
 import com.mapbox.mapboxsdk.annotations.PolylineOptions;
 import com.mapbox.mapboxsdk.camera.CameraPosition;
 import com.mapbox.mapboxsdk.camera.CameraUpdateFactory;
@@ -103,14 +105,13 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
                     mapboxMap.setOnMyLocationChangeListener(Map.this);
                     LatLng currentPosition = new LatLng(myLocation.getLatitude(), myLocation.getLongitude());
                     // move camera to current location
-                    CameraPosition cameraPosition = new CameraPosition.Builder().target(currentPosition).build();
+                    CameraPosition cameraPosition = new CameraPosition.Builder().target(currentPosition).zoom(16).build();
                     mapboxMap.moveCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
                     // add current location as first point to the polyline
                     options = new PolylineOptions();
-                    options.width(5);
-                    options.color(3);
                     options.add(currentPosition);
-                    mapboxMap.addPolyline(options);
+                    //mapboxMap.addPolyline(options);
+
                 }
             }
         });
@@ -239,7 +240,9 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Mapb
         // create a new polyline starting at the current location
         options = new PolylineOptions();
         options.add(currentPosition);
-        mapboxMap.addPolyline(options);
+        Polyline line = mapboxMap.addPolyline(options);
+        line.setColor(Color.RED);
+        line.setWidth(3);
         // enable tracking
         gpsTrackingEnabled = true;
     }
