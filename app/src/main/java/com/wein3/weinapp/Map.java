@@ -221,8 +221,9 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         Location location = mapboxMap.getMyLocation();
         if (location != null) {
             // move camera to current position
+            mapboxMap.setCameraPosition(CameraPosition.DEFAULT);
             CameraPosition cameraPosition = new CameraPosition.Builder().target(getLatLng(location)).zoom(defaultZoom).build();
-            mapboxMap.setCameraPosition(cameraPosition);
+            mapboxMap.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition), 10000);
         } else {
             // move camera to default position
             mapboxMap.setCameraPosition(CameraPosition.DEFAULT);
@@ -331,6 +332,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         switch (requestCode) {
             case REQUEST_CODE_LOCATION_SOURCE_SETTINGS:
                 initializeMapboxMap();
+                mapView.onResume();
                 break;
             default:
                 return;
@@ -420,7 +422,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         if (pathTrackingEnabled && location != null) {
             LatLng currentPosition = getLatLng(location);
             options.add(currentPosition);
-            moveCamera(currentPosition);
         }
     }
 }
