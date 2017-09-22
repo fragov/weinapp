@@ -1,29 +1,33 @@
 package com.wein3.weinapp.database;
 
+import android.app.Activity;
 import android.content.ContentValues;
 import android.database.Cursor;
 import android.database.sqlite.*;
+import android.util.Log;
 
-import com.mapbox.services.commons.geojson.GeometryCollection;
 import com.wein3.weinapp.Area;
 
+import java.io.File;
 import java.util.HashMap;
 
 public class Sqlite implements Database {
 
+    private Activity activity;
     private SQLiteDatabase sqLiteDatabase;
     private static String databaseFile = "sqlite.db";
     private static String table = "areas";
 
     @Override
-    public void init() {
-        sqLiteDatabase = SQLiteDatabase.openOrCreateDatabase(databaseFile, null);
+    public void init(Activity activity) {
+        String path = activity.getFilesDir().getParent();
+        //SQLiteDatabase.deleteDatabase(new File(path + "/" + databaseFile));
+        sqLiteDatabase = SQLiteDatabase.openOrCreateDatabase(path + "/" + databaseFile, null);
         sqLiteDatabase.execSQL("CREATE TABLE IF NOT EXISTS " + table
                 + " (id TEXT PRIMARY KEY, rev TEXT, description TEXT, gewann TEXT, size REAL,"
-                + "geometry NONE, growingRegion TEXT, currentUsage TEXT, currentLandUsage TEXT,"
+                + "featureCollection TEXT, growingRegion TEXT, currentUsage TEXT, currentLandUsage TEXT,"
                 + "category TEXT, channelWidth INTEGER, wineRowsCount INTEGER,"
                 + "wineRowsLength INTEGER, vinesCount INTEGER, usefullLife INTEGER, business TEXT);");
-
     }
 
     @Override
@@ -50,8 +54,7 @@ public class Sqlite implements Database {
             area.setDescription(row.getString(2));
             area.setGewann(row.getString(3));
             area.setSize(Double.parseDouble(row.getString(4)));
-            String json = row.getString(5);
-            area.setGeometry(GeometryCollection.fromJson(json));
+            area.setFeatureCollection(row.getString(5));
             area.setGrowingRegion(row.getString(6));
             area.setCurrentUsage(row.getString(7));
             area.setCurrentLandUsage(row.getString(8));
@@ -76,7 +79,7 @@ public class Sqlite implements Database {
         values.put("description", area.getDescription());
         values.put("gewann", area.getGewann());
         values.put("size", area.getSize());
-        values.put("geometry", area.getGeometry().toJson());
+        values.put("featureCollection", area.getFeatureCollection());
         values.put("growingRegion", area.getGrowingRegion());
         values.put("currentUsage", area.getCurrentUsage());
         values.put("currentLandUsage", area.getCurrentLandUsage());
@@ -97,7 +100,7 @@ public class Sqlite implements Database {
         values.put("description", area.getDescription());
         values.put("gewann", area.getGewann());
         values.put("size", area.getSize());
-        values.put("geometry", area.getGeometry().toJson());
+        values.put("featureCollection", area.getFeatureCollection());
         values.put("growingRegion", area.getGrowingRegion());
         values.put("currentUsage", area.getCurrentUsage());
         values.put("currentLandUsage", area.getCurrentLandUsage());

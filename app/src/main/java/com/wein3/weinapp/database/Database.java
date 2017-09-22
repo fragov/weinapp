@@ -1,14 +1,17 @@
 package com.wein3.weinapp.database;
 
+import android.app.Activity;
+
 import com.wein3.weinapp.Area;
 
 import java.util.HashMap;
 
-interface Database {
+public interface Database {
     /**
      * Initialise database
+     * @param activity Current activity
      */
-    void init();
+    void init(Activity activity);
 
     /**
      * Get list of available areas as HashMap of String ids and String descriptions
