@@ -25,6 +25,11 @@ public class DB extends AppCompatActivity implements TabLayout.OnTabSelectedList
     public TabLayout tabLayout;
     public ViewPager viewPager;
 
+    /**
+     * create Activity
+     *
+     * @param savedInstanceState
+     */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -49,11 +54,23 @@ public class DB extends AppCompatActivity implements TabLayout.OnTabSelectedList
 
         //Creating pager adapter
         PagerAdapter adapter = new PagerAdapter() {
+            /**
+             * get number of available views
+             *
+             * @return 0
+             */
             @Override
             public int getCount() {
                 return 0;
             }
 
+            /**
+             *checks if a pageview is associated with key object
+             *
+             * @param view pageview to check for association with object
+             * @param object object to check association with pageview
+             * @return true if they are associated
+             */
             @Override
             public boolean isViewFromObject(View view, Object object) {
                 return false;
@@ -65,27 +82,15 @@ public class DB extends AppCompatActivity implements TabLayout.OnTabSelectedList
 
         //Adding onTabSelectedListener to swipe views
         tabLayout.addOnTabSelectedListener(this);
-
-        viewPager.setOnPageChangeListener(new ViewPager.OnPageChangeListener() {
-
-            @Override
-            public void onPageSelected(int position) {
-                // on changing the page
-                // make respected tab selected
-                getSupportActionBar().setSelectedNavigationItem(position);
-            }
-
-            @Override
-            public void onPageScrolled(int arg0, float arg1, int arg2) {
-            }
-
-            @Override
-            public void onPageScrollStateChanged(int arg0) {
-            }
-        });
     }
 
-
+    /**
+     * is called when the return/home/up button is selected
+     * finishes this view and leads back to basic activity
+     *
+     * @param item up/home/back button
+     * @return true if button is selected
+     */
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
@@ -97,16 +102,31 @@ public class DB extends AppCompatActivity implements TabLayout.OnTabSelectedList
         return super.onOptionsItemSelected(item);
     }
 
+    /**
+     * called, when a tab enters the tab selected status
+     *
+     * @param tab which is selected
+     */
     @Override
     public void onTabSelected(TabLayout.Tab tab) {
         viewPager.setCurrentItem(tab.getPosition());
     }
 
+    /**
+     * called, when tab exists tab selected status
+     *
+     * @param tab corresponding tab
+     */
     @Override
     public void onTabUnselected(TabLayout.Tab tab) {
 
     }
 
+    /**
+     * called, when tab, which already has selected status, is selected again
+     *
+     * @param tab which is selected
+     */
     @Override
     public void onTabReselected(TabLayout.Tab tab) {
 
