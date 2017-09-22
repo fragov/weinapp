@@ -54,6 +54,11 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     private boolean pathTrackingEnabled;
     private float displayHeight;
 
+    /**
+     * Request code for intent to location source settings activity in order to enable GPS signal.
+     */
+    private final int REQUEST_CODE_LOCATION_SOURCE_SETTINGS = 0;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -122,20 +127,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                         compassShift, mapboxMap.getUiSettings().getCompassMarginRight(), (int) displayHeight - compassShift);
                 // get the current location only if GPS is enabled
                 if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-                    // initialize Mapbox map
-                    mapboxMap.setMyLocationEnabled(true);
-                    // set listener for future location changes
-                    mapboxMap.setOnMyLocationChangeListener(Map.this);
-                    // set camera to current location
-                    Location location = mapboxMap.getMyLocation();
-                    if (location != null) {
-                        // move camera to current position
-                        CameraPosition cameraPosition = new CameraPosition.Builder().target(getLatLng(location)).zoom(defaultZoom).build();
-                        mapboxMap.setCameraPosition(cameraPosition);
-                    } else {
-                        // move camera to default position
-                        mapboxMap.setCameraPosition(CameraPosition.DEFAULT);
-                    }
+                    initializeMapboxMap();
                 } else {
                     showGPSDisabledDialog();
                 }
@@ -218,6 +210,26 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     }
 
     /**
+     * Run necessary initialization for MapboxMap instance.
+     */
+    private void initializeMapboxMap() {
+        // initialize Mapbox map
+        mapboxMap.setMyLocationEnabled(true);
+        // set listener for future location changes
+        mapboxMap.setOnMyLocationChangeListener(Map.this);
+        // set camera to current location
+        Location location = mapboxMap.getMyLocation();
+        if (location != null) {
+            // move camera to current position
+            CameraPosition cameraPosition = new CameraPosition.Builder().target(getLatLng(location)).zoom(defaultZoom).build();
+            mapboxMap.setCameraPosition(cameraPosition);
+        } else {
+            // move camera to default position
+            mapboxMap.setCameraPosition(CameraPosition.DEFAULT);
+        }
+    }
+
+    /**
      * Show dialog to enable GPS.
      */
     private void showGPSDisabledDialog() {
@@ -227,7 +239,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         builder.setPositiveButton(R.string.gps_disabled_dialog_button_yes, new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
-                startActivity(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS));
+                startActivityForResult(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS), REQUEST_CODE_LOCATION_SOURCE_SETTINGS);
             }
         });
         builder.setNegativeButton(R.string.gps_disabled_dialog_button_no, new DialogInterface.OnClickListener() {
@@ -308,6 +320,23 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         fabPath.setImageResource(R.drawable.ic_record);
     }
 
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (resultCode == RESULT_CANCELED) {
+            return;
+        }
+
+        switch (requestCode) {
+            case REQUEST_CODE_LOCATION_SOURCE_SETTINGS:
+                initializeMapboxMap();
+                break;
+            default:
+                return;
+        }
+    }
+
     /**
      * Called when a view has been clicked.
      *
@@ -317,15 +346,23 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     public void onClick(View v) {
         switch (v.getId()) {
             case R.id.fabPath:
-                if (pathTrackingEnabled) {
-                    stopCurrentRoute();
+                if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                    Location location = mapboxMap.getMyLocation();
+                    if (location != null) {
+                        if (pathTrackingEnabled) {
+                            stopCurrentRoute();
+                        } else {
+                            startNewRoute();
+                        }
+                    } else {
+                        Toast.makeText(Map.this, R.string.gps_not_available, Toast.LENGTH_SHORT).show();
+                    }
                 } else {
-                    startNewRoute();
+                    Toast.makeText(Map.this, R.string.gps_turned_off, Toast.LENGTH_SHORT).show();
                 }
                 break;
             case R.id.fabLocation:
-                final LocationManager manager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-                if (manager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
                     Location location = mapboxMap.getMyLocation();
                     if (location != null) {
                         moveCamera(location);
