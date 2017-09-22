@@ -68,7 +68,7 @@ public class Tab1 extends Fragment {
      * @param inflater
      * @param container
      * @param savedInstanceState
-     * @return 
+     * @return
      */
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
@@ -76,13 +76,22 @@ public class Tab1 extends Fragment {
         return inflater.inflate(R.layout.fragment_tab1, container, false);
     }
 
-    // TODO: Rename method, update argument and hook method into UI event
+    /**
+     * handle button presses events
+     *
+     * @param uri
+     */
     public void onButtonPressed(Uri uri) {
         if (mListener != null) {
             mListener.onFragmentInteraction(uri);
         }
     }
 
+    /**
+     * called when activity is associated with this fragment
+     *
+     * @param context
+     */
     @Override
     public void onAttach(Context context) {
         super.onAttach(context);
@@ -94,6 +103,9 @@ public class Tab1 extends Fragment {
         }
     }
 
+    /**
+     * called immediately prior to Activity is no longer attached to fragment
+     */
     @Override
     public void onDetach() {
         super.onDetach();
@@ -111,7 +123,6 @@ public class Tab1 extends Fragment {
      * >Communicating with Other Fragments</a> for more information.
      */
     public interface OnFragmentInteractionListener {
-        // TODO: Update argument type and name
         void onFragmentInteraction(Uri uri);
     }
 }

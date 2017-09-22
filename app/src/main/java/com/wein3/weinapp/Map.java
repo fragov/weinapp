@@ -496,8 +496,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      */
     @Override
     public boolean onNavigationItemSelected(@NonNull MenuItem item) {
-        // Handle navigation view item clicks here.
-
         switch (item.getItemId()) {
             case R.id.Action1:
                 startActivity(new Intent(Map.this, GPS.class));
