@@ -49,7 +49,6 @@ import com.wein3.weinapp.database.Database;
 import com.wein3.weinapp.database.Sqlite;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 
 public class Map extends AppCompatActivity implements View.OnClickListener, NavigationView.OnNavigationItemSelectedListener, MapboxMap.OnMyLocationChangeListener {
@@ -63,12 +62,24 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
 
     private LocationManager locationManager;
 
-    private double defaultZoom;
+    /**
+     * Default zoom factor.
+     */
+    private double defaultZoom = 16;
 
+    /**
+     * Boolean flag indicating whether or not GPS tracking of one's current path should be enabled.
+     */
     private boolean pathTrackingEnabled;
+
+    /**
+     * Boolean flag indicating if the GPS receiver gets a valid signal.
+     */
+    private boolean receiveGpsSignal;
+
     private float displayHeight;
     private String description;
-    private Database db;
+    private Database database;
 
     /**
      * Request code for intent to location source settings activity in order to enable GPS signal.
@@ -78,19 +89,18 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        db = new Sqlite();
-        db.init(this);
-
         Mapbox.getInstance(this, getString(R.string.access_token));
         setContentView(R.layout.activity_map);
 
-        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        // initialize database
+        database = new Sqlite();
+        database.init(this);
 
-        // set global attributes
-        defaultZoom = 16;
+        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
 
         // set status variables
         pathTrackingEnabled = false;
+        receiveGpsSignal = false;
 
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
@@ -214,7 +224,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     protected void onDestroy() {
         super.onDestroy();
         mapView.onDestroy();
-        db.close();
+        database.close();
     }
 
     @Override
@@ -366,7 +376,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         positions.add(new ArrayList<Position>());
         PolygonOptions polygonOptions = new PolygonOptions();
 
-        for (LatLng point: options.getPoints()) {
+        for (LatLng point : options.getPoints()) {
             positions.get(0).add(Position.fromCoordinates(point.getLongitude(), point.getLatitude(),
                     point.getAltitude()));
             polygonOptions.add(point);
@@ -380,7 +390,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
 
         area.setFeatureCollection(featureCollection.toJson());
 
-        db.insertArea(area);
+        database.insertArea(area);
 
         mapboxMap.addPolygon(polygonOptions);
         mapboxMap.removePolyline(options.getPolyline());
@@ -397,7 +407,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         switch (requestCode) {
             case REQUEST_CODE_LOCATION_SOURCE_SETTINGS:
                 initializeMapboxMap();
-                mapView.onResume();
                 break;
         }
     }
@@ -474,9 +483,27 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      */
     @Override
     public void onMyLocationChange(@Nullable Location location) {
-        if (pathTrackingEnabled && location != null) {
-            LatLng currentPosition = getLatLng(location);
-            options.add(currentPosition);
+        if (location != null) {
+            // GPS signal is valid
+            if (!receiveGpsSignal) {
+                // GPS signal was invalid before, therefore
+                // move the camera to the current location
+                moveCamera(location);
+                // set the flag correspondingly
+                receiveGpsSignal = true;
+            }
+            // track this new location if path tracking is enabled
+            if (pathTrackingEnabled) {
+                LatLng currentPosition = getLatLng(location);
+                options.add(currentPosition);
+            }
+        } else {
+            // GPS signal is invalid
+            if (receiveGpsSignal) {
+                // GPS signal was valid before,
+                // therefore set the flag accordingly
+                receiveGpsSignal = false;
+            }
         }
     }
 }
