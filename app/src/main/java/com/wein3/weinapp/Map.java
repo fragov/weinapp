@@ -51,13 +51,18 @@ import com.wein3.weinapp.database.Sqlite;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Main activity containing the map.
+ */
 public class Map extends AppCompatActivity implements View.OnClickListener, NavigationView.OnNavigationItemSelectedListener, MapboxMap.OnMyLocationChangeListener {
 
     private MapView mapView;
-    private FloatingActionButton fabLocation;
-    private FloatingActionButton fabPath;
     private MapboxMap mapboxMap;
     private PolylineOptions options;
+
+    private FloatingActionButton fabLocation;
+    private FloatingActionButton fabPath;
+
     private LocationManager locationManager;
 
     /**
@@ -70,11 +75,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      */
     private boolean pathTrackingEnabled;
 
-    /**
-     * Boolean flag indicating if the GPS receiver gets a valid signal.
-     */
-    private boolean receiveGpsSignal;
-
     private float displayHeight;
     private String description;
     private Database database;
@@ -85,9 +85,11 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     private final int REQUEST_CODE_LOCATION_SOURCE_SETTINGS = 0;
 
     /**
-     * create Activity and instantiate Views and global Variables
+     * Create activity and instantiate views and global variables.
      *
-     * @param savedInstanceState
+     * @param savedInstanceState if the activity is being re-initialized after
+     *                           previously being shut down then this Bundle contains the data it most
+     *                           recently supplied in onSaveInstanceState() method
      */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -99,11 +101,10 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         database = new Sqlite();
         database.init(this);
 
-        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-
         // set status variables
         pathTrackingEnabled = false;
-        receiveGpsSignal = false;
+
+        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
 
         //set Toolbar
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
@@ -389,19 +390,19 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         Area area = new Area();
 
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Enter description");
+        builder.setTitle(R.string.save_polygon_dialog_enter_description);
 
         final EditText input = new EditText(this);
         input.setInputType(InputType.TYPE_CLASS_TEXT);
         builder.setView(input);
 
-        builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+        builder.setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
                 description = input.getText().toString();
             }
         });
-        builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+        builder.setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
                 dialog.cancel();
@@ -439,8 +440,8 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      * recieves Result from another Activity
      *
      * @param requestCode request code to startActivityResult() to identify from whom comes the result
-     * @param resultCode result code provided by the child Activity which is returned by its setResult() method
-     * @param data an intent which can return result data
+     * @param resultCode  result code provided by the child Activity which is returned by its setResult() method
+     * @param data        an intent which can return result data
      */
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
@@ -527,27 +528,9 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      */
     @Override
     public void onMyLocationChange(@Nullable Location location) {
-        if (location != null) {
-            // GPS signal is valid
-            if (!receiveGpsSignal) {
-                // GPS signal was invalid before, therefore
-                // move the camera to the current location
-                moveCamera(location);
-                // set the flag correspondingly
-                receiveGpsSignal = true;
-            }
-            // track this new location if path tracking is enabled
-            if (pathTrackingEnabled) {
-                LatLng currentPosition = getLatLng(location);
-                options.add(currentPosition);
-            }
-        } else {
-            // GPS signal is invalid
-            if (receiveGpsSignal) {
-                // GPS signal was valid before,
-                // therefore set the flag accordingly
-                receiveGpsSignal = false;
-            }
+        if (pathTrackingEnabled && location != null) {
+            LatLng currentPosition = getLatLng(location);
+            options.add(currentPosition);
         }
     }
 }
