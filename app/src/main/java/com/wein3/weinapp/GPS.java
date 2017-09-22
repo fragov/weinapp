@@ -1,5 +1,6 @@
 package com.wein3.weinapp;
 
+import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -10,12 +11,9 @@ import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbEndpoint;
 import android.hardware.usb.UsbInterface;
 import android.hardware.usb.UsbManager;
-import android.support.annotation.NonNull;
-import android.support.design.widget.NavigationView;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
@@ -23,27 +21,29 @@ import android.widget.Toast;
 
 import com.mapbox.mapboxsdk.geometry.LatLng;
 
-import java.io.File;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Set;
 
-public class GPS extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener {
+public class GPS extends AppCompatActivity {
 
-    private static final String LCDT = "LogCatDemoTag";
+    public static final String FAILED_RESULT = "$No Result";
+    public static final String NO_DEVICE = "No device found.";
+    public static final String LCDT = "LogCatDemoTag";
+    public static final String ACTION_USB_PERMISSION = "com.android.example.USB_PERMISSION";
 
     private Button getLatLong;
     private TextView textViewLat;
     private TextView textViewLong;
+    private TextView satTime;
 
     private LatLng lastKnownLatLng;
     private boolean hasPos = false;
 
     private byte[] bytes;
     private static final int TIMEOUT = 1000;
-    private static final int BUFFLEN = 1000;
+    private static final int BUFFLEN = 1024;
     private int recLen = 0;
-    private boolean forceClaim = true;
     private int baudRate = 4800;
 
     private UsbManager manager;
@@ -52,11 +52,53 @@ public class GPS extends AppCompatActivity implements NavigationView.OnNavigatio
     private UsbInterface intf;
     private UsbDeviceConnection connection;
     private UsbEndpoint endpoint;
-    private UsbEndpoint outEndpoint;
 
     private boolean isInit = false;
     private boolean hasEndpoint = false;
-    public BroadcastReceiver broadcastReceiver;
+
+    private final BroadcastReceiver detachReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action  = intent.getAction();
+
+            loggah("detachReceiver.onReceive()",true);
+
+            if(UsbManager.ACTION_USB_DEVICE_DETACHED.equals(action)) {
+                UsbDevice device = (UsbDevice) intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+                if(device != null) {
+                    //connection.releaseInterface(intf);
+                    //connection.close();
+                    closit();
+                    loggah("DETACHED - not null", true);
+                } else {
+                    loggah("DETACHED - null", true);
+                }
+            }
+        }
+    };
+
+    private final BroadcastReceiver permissionReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+
+            loggah("permissionReceiver.onReceive()",true);
+
+            if(ACTION_USB_PERMISSION.equals(action)) {
+                synchronized (this) {
+                    UsbDevice device = (UsbDevice) intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+
+                    if(intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
+                        if(device != null) {
+                            init();
+                        }
+                    } else {
+                        loggah("Permission denied for device.", false);
+                    }
+                }
+            }
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -66,46 +108,68 @@ public class GPS extends AppCompatActivity implements NavigationView.OnNavigatio
         getLatLong = (Button) findViewById(R.id.getLatLong);
         textViewLat = (TextView) findViewById(R.id.textViewLat);
         textViewLong = (TextView) findViewById(R.id.textViewLong);
+        satTime = (TextView) findViewById(R.id.satTime);
+
+        manager = (UsbManager) getSystemService(Context.USB_SERVICE);
+        //TODO search for right device with vendor and product id
+        device = manager.getDeviceList().values().iterator().next();
+
+        PendingIntent permissionIntent = PendingIntent.getBroadcast(this, 0, new Intent(ACTION_USB_PERMISSION), 0);
+        IntentFilter intentFilter = new IntentFilter(ACTION_USB_PERMISSION);
+        registerReceiver(permissionReceiver, intentFilter);
+
+        manager.requestPermission(device, permissionIntent);
+
+        //PendingIntent detachIntent = PendingIntent.getBroadcast(this, 0, new Intent(UsbManager.ACTION_USB_ACCESSORY_DETACHED), 0);
+        IntentFilter intentFilter2 = new IntentFilter(UsbManager.ACTION_USB_DEVICE_DETACHED);
+        registerReceiver(detachReceiver, intentFilter2);
 
         getLatLong.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                LatLng loc = GPS.this.getLastKnownLatLng();
-                String s = "Not yet implemented";
-
-                getLatLong.setText(s);
-                textViewLat.setText(s);
-                textViewLong.setText(s);
-
-                manager = (UsbManager) getSystemService(Context.USB_SERVICE);
-                //textViewLat.setText(getDeviceListToString(manager));
-
+                /*
                 Intent intent = getIntent();
                 device = (UsbDevice) intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
-                if(device == null) return;
-                textViewLat.setText(getDeviceMetaData());
+                */
+                if(device == null) {
+                    loggah("No device found upon button usage.", true);
+                    return;
+                }
 
-                init();
-                textViewLong.setText(getSomeData());
+                LatLng res = getLastKnownLatLng();
+
+                textViewLat.setText(Double.toString(res.getLatitude()));
+                textViewLong.setText(Double.toString(res.getLongitude()));
+                satTime.setText(Double.toString(res.getAltitude()));
             }
         });
     }
 
     public LatLng getLastKnownLatLng() {
+        String gga = getFirstGGAString();
+        loggah("GGA String - " + gga, false);
+        if(gga.equals(FAILED_RESULT)) return this.lastKnownLatLng;
+        lastKnownLatLng = ggaToLatLng(gga);
+        loggah("Coordinates: " + lastKnownLatLng.getLatitude() + "," + lastKnownLatLng.getLongitude(), false);
         return this.lastKnownLatLng;
     }
 
     public void closit() {
-        //Toast.makeText(getApplicationContext(), "Not yet implemented", Toast.LENGTH_SHORT).show();
-        if(hasEndpoint && connection.releaseInterface(intf)) {
-            loggah("Released interface.", false);
+        loggah("Entered closit().", false);
+        if(connection != null) {
+            if(hasEndpoint && connection.releaseInterface(intf)) {
+                loggah("Released interface.", false);
+                connection.close();
+            }
+        } else {
+            loggah("Connection is null on closit().",  false);
         }
         hasEndpoint = false;
     }
 
     private String getDeviceMetaData() {
         if(device == null) {
-            return "No device found.";
+            return NO_DEVICE;
         }
         StringBuilder stringBuilder = new StringBuilder();
 
@@ -116,39 +180,18 @@ public class GPS extends AppCompatActivity implements NavigationView.OnNavigatio
         stringBuilder.append("Device Name: ");
         stringBuilder.append(device.getDeviceName());
         stringBuilder.append('\n');
-        /*
-        stringBuilder.append("Device S/N ");
-        stringBuilder.append(device.getSerialNumber());
-        stringBuilder.append('\n');
-        */
-        stringBuilder.append("Device Class: ");
-        stringBuilder.append(device.getDeviceClass());
-        stringBuilder.append('\n');
-
-        stringBuilder.append("Device Subclass: ");
-        stringBuilder.append(device.getDeviceSubclass());
-        stringBuilder.append('\n');
-
-        stringBuilder.append("Device Protocol: ");
-        stringBuilder.append(device.getDeviceProtocol());
-        stringBuilder.append('\n');
 
         stringBuilder.append("Vendor ID: ");
         stringBuilder.append(device.getVendorId());
         stringBuilder.append('\n');
-        /*
-        stringBuilder.append("Vendor Name: ");
-        stringBuilder.append(device.getManufacturerName());
-        stringBuilder.append('\n');
-        */
+
         stringBuilder.append("Product ID: ");
         stringBuilder.append(device.getProductId());
         stringBuilder.append('\n');
-        /*
-        stringBuilder.append("Product Name: ");
-        stringBuilder.append(device.getProductName());
-        stringBuilder.append('\n');
-        */
+
+        LatLng res = ggaToLatLng(getFirstGGAString());
+        stringBuilder.append("Latitude: " + res.getLatitude() + "\n");
+        stringBuilder.append("Longitude: " + res.getLongitude() + "\n");
 
         return stringBuilder.toString();
     }
@@ -168,14 +211,15 @@ public class GPS extends AppCompatActivity implements NavigationView.OnNavigatio
 
     private String getSomeData() {
         if(device == null) {
-            return "No device found.";
+            return NO_DEVICE;
         }
-        bytes = new byte[1000];
+        bytes = new byte[BUFFLEN];
 
         connection.bulkTransfer(endpoint, bytes, bytes.length, TIMEOUT);
 
         StringBuilder raw = new StringBuilder();
-        for(int i=0; i<256; i++) {
+        //TODO make this more efficient
+        for(int i=0; i<BUFFLEN; i++) {
             char c = (char) readFromGPS();
             raw.append(c);
         }
@@ -184,11 +228,16 @@ public class GPS extends AppCompatActivity implements NavigationView.OnNavigatio
 
     @Override
     protected void onDestroy() {
-        if(broadcastReceiver != null) {
-            unregisterReceiver(broadcastReceiver);
-            broadcastReceiver = null;
+        if(detachReceiver != null) {
+            unregisterReceiver(detachReceiver);
+            loggah("unregistered BR 1", false);
+        }
+        if(permissionReceiver != null) {
+            unregisterReceiver(permissionReceiver);
+            loggah("unregistered BR 2", false);
         }
         closit();
+        loggah("super.onDestroy() to be called.", false);
         super.onDestroy();
     }
 
@@ -199,17 +248,11 @@ public class GPS extends AppCompatActivity implements NavigationView.OnNavigatio
             bytes = new byte[BUFFLEN];
 
             //https://developer.android.com/guide/topics/connectivity/usb/host.html#working-d
-            /*
-            intf = device.getInterface(0);
-            endpoint = intf.getEndpoint(0);
-            connection = manager.openDevice(device);
-            connection.claimInterface(intf, forceClaim);
-            */
             connection = manager.openDevice(device);
             if(connection != null) {
-                loggah("Got connection. Interface count: " + device.getInterfaceCount(), true);
+                loggah("Got connection. Interface count: " + device.getInterfaceCount(), false);
                 intf = device.getInterface(0);
-                loggah("Endpoint count: " + intf.getEndpointCount(), true);
+                loggah("Endpoint count: " + intf.getEndpointCount(), false);
 
                 for(int i=0; i<intf.getEndpointCount(); i++) {
                     UsbEndpoint temp = intf.getEndpoint(i);
@@ -241,30 +284,6 @@ public class GPS extends AppCompatActivity implements NavigationView.OnNavigatio
                     hasEndpoint = true;
                 }
             }
-
-            broadcastReceiver = new BroadcastReceiver() {
-                @Override
-                public void onReceive(Context context, Intent intent) {
-                    String action  = intent.getAction();
-
-                    loggah("onReceive()",true);
-
-                    if(UsbManager.ACTION_USB_ACCESSORY_DETACHED.equals(action)) {
-                        UsbDevice device = (UsbDevice) intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
-                        if(device != null) {
-                            //connection.releaseInterface(intf);
-                            //connection.close();
-                            closit();
-                            loggah("DETACHED - not null", true);
-                        } else {
-                            loggah("DETACHED - null", true);
-                        }
-                    }
-                }
-            };
-            IntentFilter intentFilter = new IntentFilter();
-            intentFilter.addAction(UsbManager.ACTION_USB_ACCESSORY_DETACHED);
-            getApplicationContext().registerReceiver(broadcastReceiver, intentFilter);
         }
     }
 
@@ -277,7 +296,7 @@ public class GPS extends AppCompatActivity implements NavigationView.OnNavigatio
 
     private int ctWrapper(int requestType, int request, int value, int index, byte[] buffer, int lenght, int timeout) {
         int res = connection.controlTransfer(requestType, request, value, index, buffer, lenght, timeout);
-        Log.e(LCDT, "ctErrorBLABWAAH");
+        if(res < 0) Log.e(LCDT, "ctErrorBLABWAAH");
         return res;
     }
 
@@ -318,14 +337,79 @@ public class GPS extends AppCompatActivity implements NavigationView.OnNavigatio
         return b;
     }
 
-    /**
-     * Called when an item in the navigation menu is selected.
-     *
-     * @param item The selected item
-     * @return true to display the item as the selected item
-     */
-    @Override
-    public boolean onNavigationItemSelected(@NonNull MenuItem item) {
-        return false;
+    public String getFirstGGAString() {
+        String data = getSomeData();
+
+        //loggah("RECEIVED DATA: " + data, false);
+
+        StringBuilder builder = new StringBuilder();
+        String[] sentences = data.split("\\$");
+        loggah("Data length: " + data.length() + "; Array Length: " + sentences.length, false);
+        String result = "No Result";
+        for(String sen: sentences) {
+            if(sen.equals("")) continue;
+            if(sen.startsWith("GPGGA")) {
+                result = sen;
+                break;
+            }
+        }
+        builder.append('$');
+        builder.append(result);
+
+        return builder.toString();
+    }
+
+    public LatLng ggaToLatLng(String gga) {
+        if(gga.equals(FAILED_RESULT)) {
+            loggah("Got invalid information from sensor.", true);
+            Log.e(LCDT, "Got invalid information from sensor.");
+            return null;
+        }
+        String[] parts = gga.split(",");
+
+        String toasterMessage = "";
+        boolean toasted = false;
+
+        double lat = 0;
+        try {
+            lat = Double.parseDouble(parts[2]);
+        } catch (NumberFormatException e) {
+            toasterMessage += "No Latitude";
+            toasted = true;
+        }
+        lat /= 100;
+        if(parts[3].equals("S")) {
+            lat *= -1;
+        }
+
+        double lng = 0;
+        try {
+            lng = Double.parseDouble(parts[4]);
+        } catch (NumberFormatException e) {
+            if(toasted) {
+                toasterMessage += " nor Longitude";
+            } else {
+                toasterMessage += "No Longitude";
+            }
+            toasted = true;
+        }
+        lng /= 100;
+        if(parts[5].equals("W")) {
+            lat *= -1;
+        }
+
+        if(toasted) {
+            toasterMessage += " found.";
+            loggah(toasterMessage, true);
+        }
+        LatLng retVal = new LatLng(lat, lng);
+        try {
+            double alt = Double.parseDouble(parts[1]);
+            //TODO don't set wrong altitude, dude
+            retVal.setAltitude(alt);
+        } catch (NumberFormatException e) {
+            loggah("Time Fail", true);
+        }
+        return retVal;
     }
 }
