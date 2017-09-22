@@ -4,6 +4,7 @@ import android.content.Context;
 import android.support.v4.app.NavUtils;
 import android.support.v4.view.PagerAdapter;
 import android.support.v4.view.ViewPager;
+import android.support.v4.app.FragmentActivity;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.widget.Toolbar;
@@ -46,7 +47,7 @@ public class DB extends AppCompatActivity implements TabLayout.OnTabSelectedList
         //Initializing viewPager
         viewPager = (ViewPager) findViewById(R.id.pager);
 
-        //Creating our pager adapter
+        //Creating pager adapter
         PagerAdapter adapter = new PagerAdapter() {
             @Override
             public int getCount() {
@@ -64,6 +65,24 @@ public class DB extends AppCompatActivity implements TabLayout.OnTabSelectedList
 
         //Adding onTabSelectedListener to swipe views
         tabLayout.addOnTabSelectedListener(this);
+
+        viewPager.setOnPageChangeListener(new ViewPager.OnPageChangeListener() {
+
+            @Override
+            public void onPageSelected(int position) {
+                // on changing the page
+                // make respected tab selected
+                getSupportActionBar().setSelectedNavigationItem(position);
+            }
+
+            @Override
+            public void onPageScrolled(int arg0, float arg1, int arg2) {
+            }
+
+            @Override
+            public void onPageScrollStateChanged(int arg0) {
+            }
+        });
     }
 
 
@@ -80,7 +99,7 @@ public class DB extends AppCompatActivity implements TabLayout.OnTabSelectedList
 
     @Override
     public void onTabSelected(TabLayout.Tab tab) {
-
+        viewPager.setCurrentItem(tab.getPosition());
     }
 
     @Override

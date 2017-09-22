@@ -8,7 +8,8 @@
 
     <android.support.design.widget.CollapsingToolbarLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="wrap_content"
+        android:id="@+id/collapsingToolbarLayout">
 
         <include layout="@layout/content_map" />
 
@@ -30,22 +31,23 @@
     </android.support.design.widget.CollapsingToolbarLayout>
 
     <android.support.design.widget.FloatingActionButton
+        android:id="@+id/fabLocation"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_marginBottom="80dp"
+        android:layout_marginRight="16dp"
+        app:backgroundTint="@android:color/white"
+        app:fabSize="auto" />
+
+    <android.support.design.widget.FloatingActionButton
         android:id="@+id/fabPath"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
         android:layout_margin="@dimen/fab_margin"
         app:backgroundTint="@android:color/white"
-        app:fabSize="normal" />
+        app:fabSize="auto" />
 
-    <android.support.design.widget.FloatingActionButton
-        android:id="@+id/fabLocation"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom|end"
-        android:layout_marginBottom="80dp"
-        android:layout_marginRight="8dp"
-        app:backgroundTint="@android:color/white"
-        app:fabSize="normal" />
 
 </android.support.design.widget.CoordinatorLayout>

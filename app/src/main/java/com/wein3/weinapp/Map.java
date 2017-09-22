@@ -78,6 +78,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
 
         fabLocation = (FloatingActionButton) findViewById(R.id.fabLocation);
         fabLocation.setOnClickListener(this);
+        fabLocation.setImageResource(R.drawable.ic_gps);
 
         DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
         ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(
