@@ -56,10 +56,8 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     private MapView mapView;
     private FloatingActionButton fabLocation;
     private FloatingActionButton fabPath;
-
     private MapboxMap mapboxMap;
     private PolylineOptions options;
-
     private LocationManager locationManager;
 
     /**
@@ -86,6 +84,11 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      */
     private final int REQUEST_CODE_LOCATION_SOURCE_SETTINGS = 0;
 
+    /**
+     * create Activity and instantiate Views and global Variables
+     *
+     * @param savedInstanceState
+     */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -102,10 +105,12 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         pathTrackingEnabled = false;
         receiveGpsSignal = false;
 
+        //set Toolbar
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         getSupportActionBar().setDisplayShowTitleEnabled(false);
 
+        //set FloatingActionButtons
         fabPath = (FloatingActionButton) findViewById(R.id.fabPath);
         fabPath.setImageResource(R.drawable.ic_record);
         fabPath.setOnClickListener(this);
@@ -114,6 +119,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         fabLocation.setOnClickListener(this);
         fabLocation.setImageResource(R.drawable.ic_gps);
 
+        //set Layout
         DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
         ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(
                 this, drawer, toolbar, R.string.navigation_drawer_open, R.string.navigation_drawer_close);
@@ -138,13 +144,14 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         mapView = (MapView) findViewById(R.id.mapView);
         mapView.onCreate(savedInstanceState);
 
+        //get screensize to replace compass
         Display display = getWindowManager().getDefaultDisplay();
         DisplayMetrics outMetrics = new DisplayMetrics();
         display.getMetrics(outMetrics);
-
         float density = getResources().getDisplayMetrics().density;
         displayHeight = outMetrics.heightPixels / density;
 
+        //set mapview
         mapView.getMapAsync(new OnMapReadyCallback() {
             @Override
             public void onMapReady(MapboxMap mbMap) {
@@ -164,6 +171,9 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         });
     }
 
+    /**
+     * close DrawerLayout
+     */
     @Override
     public void onBackPressed() {
         DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
@@ -174,52 +184,73 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         }
     }
 
+    /**
+     * inflate the menu
+     * add items to the action bar if it is present
+     *
+     * @param menu which is to be shown
+     * @return boolean menu visible
+     */
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        // Inflate the menu; this adds items to the action bar if it is present.
         getMenuInflater().inflate(R.menu.map, menu);
         return true;
     }
 
+    /**
+     * handle action bar item clicks
+     *
+     * @param item selected item
+     * @return true if item is selected
+     */
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
         int id = item.getItemId();
-
-        //noinspection SimplifiableIfStatement
         if (id == R.id.action_settings) {
             return true;
         }
-
         return super.onOptionsItemSelected(item);
     }
 
+    /**
+     * onStart --> mapView
+     */
     @Override
     public void onStart() {
         super.onStart();
         mapView.onStart();
     }
 
+    /**
+     * onResume() --> mapView
+     */
     @Override
     public void onResume() {
         super.onResume();
         mapView.onResume();
     }
 
+    /**
+     * onPause() --> mapView
+     */
     @Override
     public void onPause() {
         super.onPause();
         mapView.onPause();
     }
 
+    /**
+     * onStop() --> mapView
+     */
     @Override
     protected void onStop() {
         super.onStop();
         mapView.onStop();
     }
 
+    /**
+     * onDestroy() --> mapView
+     */
     @Override
     protected void onDestroy() {
         super.onDestroy();
@@ -227,12 +258,20 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         database.close();
     }
 
+    /**
+     * onLowMemory() --> mapView
+     */
     @Override
     public void onLowMemory() {
         super.onLowMemory();
         mapView.onLowMemory();
     }
 
+    /**
+     * save instance state of activity
+     *
+     * @param outState
+     */
     @Override
     public void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
@@ -396,6 +435,13 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         mapboxMap.removePolyline(options.getPolyline());
     }
 
+    /**
+     * recieves Result from another Activity
+     *
+     * @param requestCode request code to startActivityResult() to identify from whom comes the result
+     * @param resultCode result code provided by the child Activity which is returned by its setResult() method
+     * @param data an intent which can return result data
+     */
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
@@ -460,8 +506,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      */
     @Override
     public boolean onNavigationItemSelected(@NonNull MenuItem item) {
-        // Handle navigation view item clicks here.
-
         switch (item.getItemId()) {
             case R.id.Action1:
                 startActivity(new Intent(Map.this, GPS.class));
