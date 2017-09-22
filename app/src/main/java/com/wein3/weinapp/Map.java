@@ -11,6 +11,7 @@ import android.location.Location;
 import android.location.LocationManager;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.NavigationView;
@@ -21,14 +22,17 @@ import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.ActionBarDrawerToggle;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
+import android.text.InputType;
 import android.util.DisplayMetrics;
 import android.view.Display;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.EditText;
 import android.widget.Toast;
 
 import com.mapbox.mapboxsdk.Mapbox;
+import com.mapbox.mapboxsdk.annotations.PolygonOptions;
 import com.mapbox.mapboxsdk.annotations.Polyline;
 import com.mapbox.mapboxsdk.annotations.PolylineOptions;
 import com.mapbox.mapboxsdk.camera.CameraPosition;
@@ -37,6 +41,16 @@ import com.mapbox.mapboxsdk.geometry.LatLng;
 import com.mapbox.mapboxsdk.maps.MapView;
 import com.mapbox.mapboxsdk.maps.MapboxMap;
 import com.mapbox.mapboxsdk.maps.OnMapReadyCallback;
+import com.mapbox.services.commons.geojson.Feature;
+import com.mapbox.services.commons.geojson.FeatureCollection;
+import com.mapbox.services.commons.geojson.Polygon;
+import com.mapbox.services.commons.models.Position;
+import com.wein3.weinapp.database.Database;
+import com.wein3.weinapp.database.Sqlite;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 
 public class Map extends AppCompatActivity implements View.OnClickListener, NavigationView.OnNavigationItemSelectedListener, MapboxMap.OnMyLocationChangeListener {
 
@@ -50,6 +64,8 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     private double defaultZoom;
     private boolean pathTrackingEnabled;
     private float displayHeight;
+    private String description;
+    private Database db;
 
     /**
      * Request code for intent to location source settings activity in order to enable GPS signal.
@@ -64,6 +80,9 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        db = new Sqlite();
+        db.init(this);
+
         Mapbox.getInstance(this, getString(R.string.access_token));
         setContentView(R.layout.activity_map);
 
@@ -225,6 +244,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     protected void onDestroy() {
         super.onDestroy();
         mapView.onDestroy();
+        db.close();
     }
 
     /**
@@ -259,8 +279,9 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         Location location = mapboxMap.getMyLocation();
         if (location != null) {
             // move camera to current position
+            mapboxMap.setCameraPosition(CameraPosition.DEFAULT);
             CameraPosition cameraPosition = new CameraPosition.Builder().target(getLatLng(location)).zoom(defaultZoom).build();
-            mapboxMap.setCameraPosition(cameraPosition);
+            mapboxMap.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition), 10000);
         } else {
             // move camera to default position
             mapboxMap.setCameraPosition(CameraPosition.DEFAULT);
@@ -296,9 +317,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      * @return current location as LatLng instance
      */
     private LatLng getCurrentPosition() {
-        Location location = mapboxMap.getMyLocation();
-        LatLng currentPosition = getLatLng(location);
-        return currentPosition;
+        return getLatLng(mapboxMap.getMyLocation());
     }
 
     /**
@@ -308,8 +327,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      * @return current location as LatLng instance
      */
     private LatLng getLatLng(final Location location) {
-        LatLng position = new LatLng(location.getLatitude(), location.getLongitude());
-        return position;
+        return new LatLng(location.getLatitude(), location.getLongitude());
     }
 
     /**
@@ -356,6 +374,54 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         pathTrackingEnabled = false;
         // reset the original icon
         fabPath.setImageResource(R.drawable.ic_record);
+
+        Area area = new Area();
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Enter description");
+
+        final EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_TEXT);
+        builder.setView(input);
+
+        builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                description = input.getText().toString();
+            }
+        });
+        builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                dialog.cancel();
+            }
+        });
+
+        builder.show();
+        area.setDescription(description);
+
+        List<List<Position>> positions = new ArrayList<>();
+        positions.add(new ArrayList<Position>());
+        PolygonOptions polygonOptions = new PolygonOptions();
+
+        for (LatLng point: options.getPoints()) {
+            positions.get(0).add(Position.fromCoordinates(point.getLongitude(), point.getLatitude(),
+                    point.getAltitude()));
+            polygonOptions.add(point);
+        }
+
+
+        List<Feature> features = new ArrayList<>();
+
+        features.add(Feature.fromGeometry(Polygon.fromCoordinates(positions)));
+        FeatureCollection featureCollection = FeatureCollection.fromFeatures(features);
+
+        area.setFeatureCollection(featureCollection.toJson());
+
+        db.insertArea(area);
+
+        mapboxMap.addPolygon(polygonOptions);
+        mapboxMap.removePolyline(options.getPolyline());
     }
 
     /**
@@ -376,9 +442,8 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         switch (requestCode) {
             case REQUEST_CODE_LOCATION_SOURCE_SETTINGS:
                 initializeMapboxMap();
+                mapView.onResume();
                 break;
-            default:
-                return;
         }
     }
 
@@ -430,25 +495,17 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      * @return true to display the item as the selected item
      */
     @Override
-    public boolean onNavigationItemSelected(MenuItem item) {
+    public boolean onNavigationItemSelected(@NonNull MenuItem item) {
         // Handle navigation view item clicks here.
-        int id = item.getItemId();
 
-        if (id == R.id.Action1) {
-            Intent intent = new Intent(Map.this, GPS.class);
-            startActivity(intent);
-        } else if (id == R.id.Action2) {
-            Intent intent = new Intent(Map.this, DB.class);
-            startActivity(intent);
-        } else if (id == R.id.Action3) {
-
-        } else if (id == R.id.Action4) {
-
-        } else if (id == R.id.nav_share) {
-
-        } else if (id == R.id.nav_send) {
-
+        switch (item.getItemId()) {
+            case R.id.Action1:
+                startActivity(new Intent(Map.this, GPS.class));
+                break;
+            case R.id.Action2:
+                startActivity(new Intent(Map.this, DB.class));
         }
+
         DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
         drawer.closeDrawer(GravityCompat.START);
         return true;
@@ -465,7 +522,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         if (pathTrackingEnabled && location != null) {
             LatLng currentPosition = getLatLng(location);
             options.add(currentPosition);
-            moveCamera(currentPosition);
         }
     }
 }

@@ -1,14 +1,12 @@
 package com.wein3.weinapp;
 
-import com.mapbox.services.commons.geojson.GeometryCollection;
-
 public class Area {
     private String id;
     private String rev;
     private String description;
     private String gewann;
     private Double size;
-    private GeometryCollection geometry;
+    private String featureCollection;
     private String growingRegion;
     private String currentUsage;
     private String currentLandUsage;
@@ -60,12 +58,12 @@ public class Area {
         this.size = size;
     }
 
-    public GeometryCollection getGeometry() {
-        return geometry;
+    public String getFeatureCollection() {
+        return featureCollection;
     }
 
-    public void setGeometry(GeometryCollection geometry) {
-        this.geometry = geometry;
+    public void setFeatureCollection(String featureCollection) {
+        this.featureCollection = featureCollection;
     }
 
     public String getGrowingRegion() {
