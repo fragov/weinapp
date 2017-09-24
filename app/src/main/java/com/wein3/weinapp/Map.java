@@ -2,9 +2,11 @@ package com.wein3.weinapp;
 
 import android.Manifest;
 import android.app.AlertDialog;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.location.Location;
@@ -17,6 +19,7 @@ import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.NavigationView;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
+import android.support.v4.content.LocalBroadcastManager;
 import android.support.v4.view.GravityCompat;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.ActionBarDrawerToggle;
@@ -24,6 +27,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.text.InputType;
 import android.util.DisplayMetrics;
+import android.util.Log;
 import android.view.Display;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -82,6 +86,8 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     private FloatingActionButton fabLocation;
     private FloatingActionButton fabPath;
     private LocationManager locationManager;
+    private Intent i;
+
     /**
      * Boolean flag indicating whether or not GPS tracking of one's current path is enabled.
      */
@@ -189,7 +195,25 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                 }
             }
         });
+        LocalBroadcastManager.getInstance(this).registerReceiver(mMessageReceiver,
+                new IntentFilter("GPSLocationUpdates"));
     }
+
+
+    private BroadcastReceiver mMessageReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            // Get extra data included in the Intent
+            if(pathTrackingEnabled) {
+                String message = intent.getStringExtra("coords");
+                String[] parts = message.split(",");
+                for (int i = 0; i < parts.length - 1; i += 2) {
+                    options.add(new LatLng(Double.parseDouble(parts[i]), Double.parseDouble(parts[i + 1])));
+                }
+            }
+        }
+    };
+
 
     /**
      * close DrawerLayout
@@ -246,8 +270,10 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      */
     @Override
     public void onResume() {
+        Intent i = new Intent(this, TrackingService.class);
         super.onResume();
         mapView.onResume();
+        stopService(i);
     }
 
     /**
@@ -255,8 +281,10 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      */
     @Override
     public void onPause() {
+        Intent i = new Intent(this, TrackingService.class);
         super.onPause();
         mapView.onPause();
+        startService(i);
     }
 
     /**
