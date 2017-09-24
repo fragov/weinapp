@@ -86,7 +86,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     private FloatingActionButton fabLocation;
     private FloatingActionButton fabPath;
     private LocationManager locationManager;
-    private Intent i;
 
     /**
      * Boolean flag indicating whether or not GPS tracking of one's current path is enabled.
@@ -284,7 +283,9 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         Intent i = new Intent(this, TrackingService.class);
         super.onPause();
         mapView.onPause();
-        startService(i);
+        if(pathTrackingEnabled) {
+            startService(i);
+        }
     }
 
     /**
