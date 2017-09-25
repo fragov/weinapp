@@ -30,21 +30,22 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".GPS">
+        <activity android:name=".GPSTester">
+
             <!--
             <intent-filter>
                 <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
             </intent-filter>
             <meta-data android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
                 android:resource="@xml/device_filter"/>
-             -->
+            -->
         </activity>
-        <activity android:name=".DB"></activity>
+        <activity android:name=".DB" />
+
         <service
             android:name=".TrackingService"
             android:enabled="true"
-            android:exported="true" >
-        </service>
+            android:exported="true"></service>
     </application>
 
 </manifest>

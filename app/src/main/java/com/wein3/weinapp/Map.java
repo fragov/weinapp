@@ -606,7 +606,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     public boolean onNavigationItemSelected(@NonNull MenuItem item) {
         switch (item.getItemId()) {
             case R.id.Action1:
-                startActivity(new Intent(Map.this, GPS.class));
+                startActivity(new Intent(Map.this, GPSTester.class));
                 break;
             case R.id.Action2:
                 startActivity(new Intent(Map.this, DB.class));
