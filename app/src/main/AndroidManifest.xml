@@ -45,13 +45,10 @@
         <service
             android:name=".TrackingService"
             android:enabled="true"
-<<<<<<< HEAD
+
             android:exported="true" >
         </service>
         <activity android:name=".DBContent"></activity>
-=======
-            android:exported="true"></service>
->>>>>>> 02a8576e0cb42cba524a5cf60f35a26c46954c43
     </application>
 
 </manifest>
