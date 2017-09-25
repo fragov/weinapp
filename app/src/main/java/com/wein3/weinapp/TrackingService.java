@@ -1,5 +1,8 @@
 package com.wein3.weinapp;
 
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
 import android.location.Location;
@@ -20,6 +23,8 @@ public class TrackingService extends Service implements MapboxMap.OnMyLocationCh
     private MapView mapView;
     private MapboxMap mapboxMap;
     private StringBuilder sb;
+    private NotificationManager mNM;
+    //private int NOTIFICATION = R.string.local_service_started;
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -28,6 +33,11 @@ public class TrackingService extends Service implements MapboxMap.OnMyLocationCh
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        mNM = (NotificationManager)getSystemService(NOTIFICATION_SERVICE);
+
+        // Display a notification about us starting.  We put an icon in the status bar.
+        showRecordingNotification();
+
         //get the Mapview from the xml Layout file
         LayoutInflater inflater = (LayoutInflater) getSystemService(LAYOUT_INFLATER_SERVICE);
         View layout = inflater.inflate(R.layout.content_map, null);
@@ -50,6 +60,7 @@ public class TrackingService extends Service implements MapboxMap.OnMyLocationCh
         super.onDestroy();
         //this service sends the whole String with all coordinates to the Map activity
         sendMessageToActivity(sb.toString());
+       // mNM.cancel(NOTIFICATION);
     }
 
 
@@ -58,6 +69,10 @@ public class TrackingService extends Service implements MapboxMap.OnMyLocationCh
         mapboxMap.setMyLocationEnabled(true);
         // set listener for future location changes
         mapboxMap.setOnMyLocationChangeListener(TrackingService.this);
+    }
+
+    private void showRecordingNotification(){
+
     }
 
     private void sendMessageToActivity(String message) {

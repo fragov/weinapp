@@ -94,6 +94,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     private float displayHeight;
     private String description;
     private Database database;
+    private boolean trackingServiceStarted = false;
 
     /**
      * Create activity and instantiate views and global variables.
@@ -269,6 +270,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      */
     @Override
     public void onResume() {
+        trackingServiceStarted = false;
         Intent i = new Intent(this, TrackingService.class);
         super.onResume();
         mapView.onResume();
@@ -285,6 +287,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         mapView.onPause();
         if(pathTrackingEnabled) {
             startService(i);
+            trackingServiceStarted = true;
         }
     }
 
@@ -603,7 +606,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      */
     @Override
     public void onMyLocationChange(@Nullable Location location) {
-        if (pathTrackingEnabled && location != null) {
+        if (pathTrackingEnabled && location != null && trackingServiceStarted == false) {
             LatLng currentPosition = getLatLng(location);
             options.add(currentPosition);
         }
