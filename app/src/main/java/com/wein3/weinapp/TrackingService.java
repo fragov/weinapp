@@ -24,7 +24,7 @@ public class TrackingService extends Service implements MapboxMap.OnMyLocationCh
     private MapView mapView;
     private MapboxMap mapboxMap;
     private StringBuilder sb;
-    private NotificationManager mNM;
+    private NotificationManager nManager;
     private int NOTIFICATION = R.string.local_service_started;
 
     @Override
@@ -35,7 +35,7 @@ public class TrackingService extends Service implements MapboxMap.OnMyLocationCh
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         //get the Manager for the notification
-        mNM = (NotificationManager)getSystemService(NOTIFICATION_SERVICE);
+        nManager = (NotificationManager)getSystemService(NOTIFICATION_SERVICE);
         // Display a notification about us starting.  We put an icon in the status bar.
         showRecordingNotification();
         //gets an instance of Mapbox with our token
@@ -62,7 +62,7 @@ public class TrackingService extends Service implements MapboxMap.OnMyLocationCh
         super.onDestroy();
         //this service sends the whole String with all coordinates to the Map activity
         sendMessageToActivity(sb.toString());
-        mNM.cancel(NOTIFICATION);
+        nManager.cancel(NOTIFICATION);
     }
 
 
@@ -85,10 +85,11 @@ public class TrackingService extends Service implements MapboxMap.OnMyLocationCh
                 .setWhen(System.currentTimeMillis())  // the time stamp
                 .setContentTitle(getText(R.string.local_service_started))  // the label of the entry
                 .setContentIntent(contentIntent)  // The intent to send when the entry is clicked
+                .setOngoing(true)  //makes the swipe of notification impossible
                 .build();
 
         // Send the notification.
-        mNM.notify(NOTIFICATION, notification);
+        nManager.notify(NOTIFICATION, notification);
     }
 
     private void sendMessageToActivity(String message) {
