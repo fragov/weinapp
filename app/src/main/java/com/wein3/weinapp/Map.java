@@ -45,6 +45,8 @@ import com.mapbox.mapboxsdk.geometry.LatLng;
 import com.mapbox.mapboxsdk.maps.MapView;
 import com.mapbox.mapboxsdk.maps.MapboxMap;
 import com.mapbox.mapboxsdk.maps.OnMapReadyCallback;
+import com.mapbox.mapboxsdk.style.layers.LineLayer;
+import com.mapbox.mapboxsdk.style.sources.GeoJsonSource;
 import com.mapbox.services.commons.geojson.Feature;
 import com.mapbox.services.commons.geojson.FeatureCollection;
 import com.mapbox.services.commons.geojson.Polygon;
@@ -93,6 +95,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     private boolean pathTrackingEnabled;
     private float displayHeight;
     private String description;
+    private Area newArea;
     private Database database;
     private boolean trackingServiceStarted = false;
 
@@ -106,6 +109,9 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        database = new Sqlite();
+        database.init(this);
+
         Mapbox.getInstance(this, getString(R.string.access_token));
         setContentView(R.layout.activity_map);
 
@@ -192,6 +198,18 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                     // GPS is not enabled, therefore show corresponding
                     // dialog asking to enable GPS signal
                     showGPSDisabledDialog();
+                }
+
+                for(String id: database.getListOfAreas().keySet()) {
+                    Area area = database.getAreaById(id);
+                    try {
+                        GeoJsonSource geoJsonSource = new GeoJsonSource(area.getId(), area.getFeatureCollection());
+                        mapboxMap.addSource(geoJsonSource);
+                        LineLayer lineLayer = new LineLayer(area.getId(), area.getId());
+                        mapboxMap.addLayer(lineLayer);
+                    } catch (Exception e) {
+                        Log.d("DATABASE", e.toString());
+                    }
                 }
             }
         });
@@ -477,7 +495,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         // reset the original icon
         fabPath.setImageResource(R.drawable.ic_record);
 
-        Area area = new Area();
+        newArea = new Area();
 
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle(R.string.save_polygon_dialog_enter_description);
@@ -490,40 +508,41 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
             @Override
             public void onClick(DialogInterface dialog, int which) {
                 description = input.getText().toString();
+                newArea.setDescription(description);
+
+                List<List<Position>> positions = new ArrayList<>();
+                positions.add(new ArrayList<Position>());
+                PolygonOptions polygonOptions = new PolygonOptions();
+
+                for (LatLng point: options.getPoints()) {
+                    positions.get(0).add(Position.fromCoordinates(point.getLongitude(), point.getLatitude(),
+                            point.getAltitude()));
+                    polygonOptions.add(point);
+                }
+
+
+                List<Feature> features = new ArrayList<>();
+
+                features.add(Feature.fromGeometry(Polygon.fromCoordinates(positions)));
+                FeatureCollection featureCollection = FeatureCollection.fromFeatures(features);
+
+                newArea.setFeatureCollection(featureCollection.toJson());
+
+                database.insertArea(newArea);
+
+                mapboxMap.addPolygon(polygonOptions);
+                mapboxMap.removePolyline(options.getPolyline());
             }
         });
-        builder.setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
+        builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
                 dialog.cancel();
+                mapboxMap.removePolyline(options.getPolyline());
             }
         });
 
         builder.show();
-        area.setDescription(description);
-
-        List<List<Position>> positions = new ArrayList<>();
-        positions.add(new ArrayList<Position>());
-        PolygonOptions polygonOptions = new PolygonOptions();
-
-        for (LatLng point : options.getPoints()) {
-            positions.get(0).add(Position.fromCoordinates(point.getLongitude(), point.getLatitude(),
-                    point.getAltitude()));
-            polygonOptions.add(point);
-        }
-
-
-        List<Feature> features = new ArrayList<>();
-
-        features.add(Feature.fromGeometry(Polygon.fromCoordinates(positions)));
-        FeatureCollection featureCollection = FeatureCollection.fromFeatures(features);
-
-        area.setFeatureCollection(featureCollection.toJson());
-
-        database.insertArea(area);
-
-        mapboxMap.addPolygon(polygonOptions);
-        mapboxMap.removePolyline(options.getPolyline());
     }
 
     /**

@@ -4,16 +4,14 @@ import android.app.Activity;
 import android.content.ContentValues;
 import android.database.Cursor;
 import android.database.sqlite.*;
-import android.util.Log;
 
 import com.wein3.weinapp.Area;
 
-import java.io.File;
 import java.util.HashMap;
+import java.util.UUID;
 
 public class Sqlite implements Database {
 
-    private Activity activity;
     private SQLiteDatabase sqLiteDatabase;
     private static String databaseFile = "sqlite.db";
     private static String table = "areas";
@@ -46,25 +44,25 @@ public class Sqlite implements Database {
     @Override
     public Area getAreaById(String id) {
         Area area = null;
-        Cursor row = sqLiteDatabase.rawQuery("SELECT * FROM " + table, null);
+        Cursor row = sqLiteDatabase.rawQuery("SELECT * FROM " + table + " WHERE id = '" + id + "'", null);
         if (row.moveToFirst()) {
             area = new Area();
-            area.setId(row.getString(0));
-            area.setRev(row.getString(1));
-            area.setDescription(row.getString(2));
-            area.setGewann(row.getString(3));
-            area.setSize(Double.parseDouble(row.getString(4)));
-            area.setFeatureCollection(row.getString(5));
-            area.setGrowingRegion(row.getString(6));
-            area.setCurrentUsage(row.getString(7));
-            area.setCurrentLandUsage(row.getString(8));
-            area.setCategory(row.getString(9));
-            area.setChannelWidth(Integer.parseInt(row.getString(10)));
-            area.setWineRowsCount(Integer.parseInt(row.getString(11)));
-            area.setWineRowsLength(Integer.parseInt(row.getString(12)));
-            area.setVinesCount(Integer.parseInt(row.getString(13)));
-            area.setUsefullLife(Integer.parseInt(row.getString(14)));
-            area.setBusiness(row.getString(15));
+            area.setId(row.getString(0) != null ? row.getString(0) : "");
+            area.setRev(row.getString(1) != null ? row.getString(1) : "");
+            area.setDescription(row.getString(2) != null ? row.getString(2) : "");
+            area.setGewann(row.getString(3) != null ? row.getString(3) : "");
+            area.setSize(row.getString(4) != null ? Double.parseDouble(row.getString(4)) : 0.0);
+            area.setFeatureCollection(row.getString(5) != null ? row.getString(5) : "");
+            area.setGrowingRegion(row.getString(6) != null ? row.getString(6) : "");
+            area.setCurrentUsage(row.getString(7) != null ? row.getString(7) : "");
+            area.setCurrentLandUsage(row.getString(8) != null ? row.getString(8) : "");
+            area.setCategory(row.getString(9) != null ? row.getString(9) : "");
+            area.setChannelWidth(row.getString(10) != null ? Integer.parseInt(row.getString(10)) : 0);
+            area.setWineRowsCount(row.getString(11) != null ? Integer.parseInt(row.getString(11)) : 0);
+            area.setWineRowsLength(row.getString(12) != null ? Integer.parseInt(row.getString(12)) : 0);
+            area.setVinesCount(row.getString(13) != null ? Integer.parseInt(row.getString(13)) : 0);
+            area.setUsefullLife(row.getString(14) != null ? Integer.parseInt(row.getString(14)) : 0);
+            area.setBusiness(row.getString(15) != null ? row.getString(15) : "");
 
             row.close();
         }
@@ -75,6 +73,8 @@ public class Sqlite implements Database {
     @Override
     public String insertArea(Area area) {
         ContentValues values = new ContentValues();
+        String uuid = UUID.randomUUID().toString();
+        values.put("id", uuid);
         values.put("rev", area.getRev());
         values.put("description", area.getDescription());
         values.put("gewann", area.getGewann());
@@ -90,7 +90,8 @@ public class Sqlite implements Database {
         values.put("vinesCount", area.getVinesCount());
         values.put("usefullLife", area.getUsefullLife());
         values.put("business", area.getBusiness());
-        return Long.toString(sqLiteDatabase.insert(table, null, values));
+        sqLiteDatabase.insert(table, null, values);
+        return uuid;
     }
 
     @Override
