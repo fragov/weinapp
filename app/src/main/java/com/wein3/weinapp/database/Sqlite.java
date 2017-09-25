@@ -7,6 +7,7 @@ import android.database.sqlite.*;
 
 import com.wein3.weinapp.Area;
 
+import java.io.File;
 import java.util.HashMap;
 import java.util.UUID;
 

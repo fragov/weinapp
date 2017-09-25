@@ -609,7 +609,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                 startActivity(new Intent(Map.this, GPS.class));
                 break;
             case R.id.Action2:
-                startActivity(new Intent(Map.this, DB.class));
+                startActivity(new Intent(Map.this, DBContent.class));
         }
 
         DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
