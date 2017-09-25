@@ -11,12 +11,7 @@ import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbEndpoint;
 import android.hardware.usb.UsbInterface;
 import android.hardware.usb.UsbManager;
-import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
 import android.util.Log;
-import android.view.View;
-import android.widget.Button;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import com.mapbox.mapboxsdk.geometry.LatLng;
@@ -24,10 +19,12 @@ import com.mapbox.mapboxsdk.geometry.LatLng;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.Observable;
 import java.util.Set;
 
-public class GPS {
+/**
+ * TODO consider turning this into a singleton
+ */
+public class GPS implements GPSDataSender {
 
     public static final String FAILED_RESULT = "$No Result";
     public static final String NO_DEVICE = "No device found.";
@@ -35,6 +32,9 @@ public class GPS {
     public static final String ACTION_USB_PERMISSION = "com.android.example.USB_PERMISSION";
 
     private static final ArrayList<DeviceInfoWrapper> possibleDevicesList = new ArrayList<>();
+
+    private static GPSDataReceiver gpsDataReceiver;
+    private long pollingInterval = -1;
 
     private LatLng lastKnownLatLng;
     private boolean hasPos = false;
@@ -70,8 +70,10 @@ public class GPS {
             if(UsbManager.ACTION_USB_DEVICE_ATTACHED.equals(action)) {
                 UsbDevice device = (UsbDevice) intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
                 if(device != null) {
-                    PendingIntent permissionIntent = PendingIntent.getBroadcast(context, 0, new Intent(ACTION_USB_PERMISSION), 0);
-                    manager.requestPermission(device, permissionIntent);
+                    //PendingIntent permissionIntent = PendingIntent.getBroadcast(context, 0, new Intent(ACTION_USB_PERMISSION), 0);
+                    //manager.requestPermission(device, permissionIntent);
+                    loggah("THIS IS THE BUG!!!", false);
+                    onCreate();
                     loggah("ATTACHED - not null", false);
                 } else {
                     loggah("ATTACHED - null", false);
@@ -293,6 +295,7 @@ public class GPS {
     }
 
     private void onCreate() {
+        //TODO test all connected devices with nested loops
         Iterator<UsbDevice> iterator = manager.getDeviceList().values().iterator();
         if(iterator.hasNext()) {
             device = iterator.next();
@@ -307,8 +310,8 @@ public class GPS {
             loggah("Maybe no device at startup: " + nullHoldsAtOnCreate + ", " + emptyDeviceListHoldsAtOnCreate, false);
             return;
         }
-        DeviceInfoWrapper currDiw = new DeviceInfoWrapper(device.getVendorId(), device.getProductId());
 
+        DeviceInfoWrapper currDiw = new DeviceInfoWrapper(device.getVendorId(), device.getProductId());
         boolean supportedDeviceConnected = false;
         for(DeviceInfoWrapper diw: possibleDevicesList) {
             if(diw.equals(currDiw)) {
@@ -485,6 +488,69 @@ public class GPS {
         Log.d(LCDT, mess);
         if(toast) {
             Toast.makeText(context, mess, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    @Override
+    public GPSDataReceiver getReceiver() {
+        return this.gpsDataReceiver;
+    }
+
+    @Override
+    public void registerReceiver(GPSDataReceiver gpsDataReceiver) {
+        //we could do this with an ArrayList, but we can only use it once
+        this.gpsDataReceiver = gpsDataReceiver;
+    }
+
+    @Override
+    public void setPollingInterval(long millis) {
+        this.pollingInterval = millis;
+    }
+
+    @Override
+    public void updateReceivers() {
+        //we could do this with an ArrayList, but we can only use it once
+        this.gpsDataReceiver.onUSBGPSLocationChanged(getLastKnownLatLng());
+    }
+
+    @Override
+    public void startPolling() {
+        //TODO human-generated method stub
+    }
+
+    @Override
+    public void stopPolling() {
+        //TODO human-generated method stub
+    }
+
+    private class PollingClock implements Runnable{
+        long wait;
+        boolean stopFlag;
+
+        public PollingClock(long time) {
+            this.wait = time;
+            stopFlag = false;
+        }
+
+        @Override
+        public void run() {
+            while(!stopFlag) {
+                //TODO set this in another Thread
+                //GPS.this.setLastKnownLatLng();
+                try {
+                    Thread.sleep(this.wait);
+                    //if errors, try
+                    //this.wait(this.wait);
+                } catch (InterruptedException e) {
+                    Log.e(LCDT, "Couldn't wait in PollingClock.");
+                    this.stop();
+                }
+                updateReceivers();
+            }
+        }
+
+        public void stop () {
+            this.stopFlag = true;
         }
     }
 }

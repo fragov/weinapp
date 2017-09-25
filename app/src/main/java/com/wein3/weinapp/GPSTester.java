@@ -8,7 +8,7 @@ import android.widget.TextView;
 
 import com.mapbox.mapboxsdk.geometry.LatLng;
 
-public class GPSTester extends AppCompatActivity {
+public class GPSTester extends AppCompatActivity implements GPSDataReceiver {
 
     private Button getLatLong;
     private TextView textViewLat;
@@ -41,11 +41,9 @@ public class GPSTester extends AppCompatActivity {
                     return;
                 }
 
+                //don't use that when my awesome Observer thingy is implemented
                 LatLng res = gps.getLastKnownLatLng();
-
-                textViewLat.setText(Double.toString(res.getLatitude()));
-                textViewLong.setText(Double.toString(res.getLongitude()));
-                satTime.setText(Double.toString(res.getAltitude()));
+                GPSTester.this.onUSBGPSLocationChanged(res);
             }
         });
     }
@@ -58,5 +56,20 @@ public class GPSTester extends AppCompatActivity {
     protected void onDestroy() {
         if(gps != null) gps.onDestroy();
         super.onDestroy();
+    }
+
+    @Override
+    public void setReceiver() {
+        if(gps != null) {
+            gps.registerReceiver(this);
+            gps.setPollingInterval(5000);
+        }
+    }
+
+    @Override
+    public void onUSBGPSLocationChanged(LatLng location) {
+        textViewLat.setText(Double.toString(location.getLatitude()));
+        textViewLong.setText(Double.toString(location.getLongitude()));
+        satTime.setText(Double.toString(location.getAltitude()));
     }
 }
