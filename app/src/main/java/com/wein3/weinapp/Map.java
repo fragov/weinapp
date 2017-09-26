@@ -52,6 +52,7 @@ import com.mapbox.services.commons.geojson.FeatureCollection;
 import com.mapbox.services.commons.geojson.Polygon;
 import com.mapbox.services.commons.models.Position;
 import com.wein3.weinapp.database.Database;
+import com.wein3.weinapp.database.HelperDatabase;
 import com.wein3.weinapp.database.Sqlite;
 
 import java.util.ArrayList;
@@ -82,6 +83,26 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      */
     private final int REQUEST_CODE_LOCATION_SOURCE_SETTINGS = 0;
 
+    /**
+     * Boolean flag indicating whether or not GPS tracking of one's current path is enabled.
+     */
+    private boolean pathTrackingEnabled = false;
+
+    /**
+     * Boolean flag indicating whether or not GPS tracking service is started.
+     */
+    private boolean trackingServiceStarted = false;
+
+    /**
+     * Database handler to store polygons.
+     */
+    private Database mainDatabase;
+
+    /**
+     * Database handler to temporarily store the current path.
+     */
+    private HelperDatabase helperDatabase;
+
     private MapView mapView;
     private MapboxMap mapboxMap;
     private PolylineOptions options;
@@ -89,15 +110,8 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     private FloatingActionButton fabPath;
     private LocationManager locationManager;
 
-    /**
-     * Boolean flag indicating whether or not GPS tracking of one's current path is enabled.
-     */
-    private boolean pathTrackingEnabled;
-    private float displayHeight;
     private String description;
     private Area newArea;
-    private Database database;
-    private boolean trackingServiceStarted = false;
 
     /**
      * Create activity and instantiate views and global variables.
@@ -109,36 +123,33 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        database = new Sqlite();
-        database.init(this);
-
         Mapbox.getInstance(this, getString(R.string.access_token));
         setContentView(R.layout.activity_map);
 
-        // initialize database
-        database = new Sqlite();
-        database.init(this);
+        // create or open main database
+        mainDatabase = new Sqlite();
+        mainDatabase.init(this);
 
-        // set status variables
-        pathTrackingEnabled = false;
+        // create or open helper database
+        helperDatabase = new HelperDatabase();
+        helperDatabase.init(this);
 
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
 
-        //set Toolbar
+        // set Toolbar
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         getSupportActionBar().setDisplayShowTitleEnabled(false);
 
-        //set FloatingActionButtons
+        // set FloatingActionButtons
         fabPath = (FloatingActionButton) findViewById(R.id.fabPath);
         fabPath.setImageResource(R.drawable.ic_record);
         fabPath.setOnClickListener(this);
-
         fabLocation = (FloatingActionButton) findViewById(R.id.fabLocation);
         fabLocation.setOnClickListener(this);
         fabLocation.setImageResource(R.drawable.ic_gps);
 
-        //set Layout
+        // set layout
         DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
         ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(
                 this, drawer, toolbar, R.string.navigation_drawer_open, R.string.navigation_drawer_close);
@@ -163,26 +174,24 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         mapView = (MapView) findViewById(R.id.mapView);
         mapView.onCreate(savedInstanceState);
 
-        //get screensize to replace compass
-        Display display = getWindowManager().getDefaultDisplay();
-        DisplayMetrics outMetrics = new DisplayMetrics();
-        display.getMetrics(outMetrics);
-        float density = getResources().getDisplayMetrics().density;
-        displayHeight = outMetrics.heightPixels / density;
-
         // run custom initialization steps as soon as the MapboxMap instance is ready
         mapView.getMapAsync(new OnMapReadyCallback() {
             @Override
             public void onMapReady(MapboxMap mbMap) {
                 // get Mapbox map instance
                 mapboxMap = mbMap;
-                // move compass on the map
+                // move compass on the map according to current screen size
+                Display display = getWindowManager().getDefaultDisplay();
+                DisplayMetrics outMetrics = new DisplayMetrics();
+                display.getMetrics(outMetrics);
+                float density = getResources().getDisplayMetrics().density;
+                int displayHeight = (int) (outMetrics.heightPixels / density);
                 int compassShift = 80;
                 mapboxMap.getUiSettings().setCompassMargins(
                         mapboxMap.getUiSettings().getCompassMarginLeft(),
                         compassShift,
                         mapboxMap.getUiSettings().getCompassMarginRight(),
-                        (int) displayHeight - compassShift
+                        displayHeight - compassShift
                 );
                 // enable plotting of current (or last known) location
                 mapboxMap.setMyLocationEnabled(true);
@@ -200,8 +209,8 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                     showGPSDisabledDialog();
                 }
 
-                for(String id: database.getListOfAreas().keySet()) {
-                    Area area = database.getAreaById(id);
+                for(String id: mainDatabase.getListOfAreas().keySet()) {
+                    Area area = mainDatabase.getAreaById(id);
                     try {
                         GeoJsonSource geoJsonSource = new GeoJsonSource(area.getId(), area.getFeatureCollection());
                         mapboxMap.addSource(geoJsonSource);
@@ -284,27 +293,28 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     }
 
     /**
-     * onResume() --> mapView
+     * Make activity accessible and stop GPS tracking service.
      */
     @Override
     public void onResume() {
-        trackingServiceStarted = false;
-        Intent i = new Intent(this, TrackingService.class);
         super.onResume();
         mapView.onResume();
-        stopService(i);
+        Intent intent = new Intent(this, TrackingService.class);
+        stopService(intent);
+        trackingServiceStarted = false;
     }
 
     /**
-     * onPause() --> mapView
+     * Push activity to the background and start GPS tracking
+     * service if the path should be tracked.
      */
     @Override
     public void onPause() {
-        Intent i = new Intent(this, TrackingService.class);
         super.onPause();
         mapView.onPause();
         if(pathTrackingEnabled) {
-            startService(i);
+            Intent intent = new Intent(this, TrackingService.class);
+            startService(intent);
             trackingServiceStarted = true;
         }
     }
@@ -319,13 +329,14 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     }
 
     /**
-     * onDestroy() --> mapView
+     * Destroy activity and close databases.
      */
     @Override
     protected void onDestroy() {
         super.onDestroy();
         mapView.onDestroy();
-        database.close();
+        mainDatabase.close();
+        helperDatabase.close();
     }
 
     /**
@@ -367,7 +378,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         builder.setNegativeButton(R.string.gps_disabled_dialog_button_no, new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
-
+                dialog.cancel();
             }
         });
         builder.create();
@@ -424,7 +435,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
             } else {
                 mapboxMap.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
             }
-
         }
     }
 
@@ -528,13 +538,13 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
 
                 newArea.setFeatureCollection(featureCollection.toJson());
 
-                database.insertArea(newArea);
+                mainDatabase.insertArea(newArea);
 
                 mapboxMap.addPolygon(polygonOptions);
                 mapboxMap.removePolyline(options.getPolyline());
             }
         });
-        builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+        builder.setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
                 dialog.cancel();

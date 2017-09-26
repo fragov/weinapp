@@ -18,7 +18,7 @@ public class HelperDatabase {
     private final String TABLE = "current_path";
 
     /**
-     * Initialize the temporary database.
+     * Initialize temporary database.
      *
      * @param activity current Activity instance
      */
