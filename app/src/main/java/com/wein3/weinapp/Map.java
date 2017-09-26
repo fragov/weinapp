@@ -243,7 +243,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
 
 
     /**
-     * close DrawerLayout
+     * Close DrawerLayout.
      */
     @Override
     public void onBackPressed() {
@@ -256,11 +256,10 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     }
 
     /**
-     * inflate the menu
-     * add items to the action bar if it is present
+     * Inflate the menu and add items to the action bar if it is present.
      *
-     * @param menu which is to be shown
-     * @return boolean menu visible
+     * @param menu Menu instance which should be shown
+     * @return boolean indicating if menu is visible
      */
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -269,7 +268,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     }
 
     /**
-     * handle action bar item clicks
+     * Handle action bar item clicks.
      *
      * @param item selected item
      * @return true if item is selected
@@ -284,12 +283,14 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     }
 
     /**
-     * onStart --> mapView
+     * Start activity and get recently saved path from database.
      */
     @Override
     public void onStart() {
         super.onStart();
         mapView.onStart();
+        PolylineOptions polylineOptions = helperDatabase.getCurrentPath();
+        Toast.makeText(getBaseContext(), String.valueOf(polylineOptions.getPoints().size()), Toast.LENGTH_LONG).show();
     }
 
     /**
@@ -306,7 +307,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
 
     /**
      * Push activity to the background and start GPS tracking
-     * service if the path should be tracked.
+     * service in the case the current path should be tracked.
      */
     @Override
     public void onPause() {
@@ -320,12 +321,15 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     }
 
     /**
-     * onStop() --> mapView
+     * Stop activity and save current path in database in the case it should be tracked.
      */
     @Override
     protected void onStop() {
         super.onStop();
         mapView.onStop();
+        if (pathTrackingEnabled) {
+            helperDatabase.updateCurrentPath(options);
+        }
     }
 
     /**
@@ -378,7 +382,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         builder.setNegativeButton(R.string.gps_disabled_dialog_button_no, new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
-                dialog.cancel();
+                dialog.dismiss();
             }
         });
         builder.create();
@@ -509,7 +513,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
 
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle(R.string.save_polygon_dialog_enter_description);
-
         final EditText input = new EditText(this);
         input.setInputType(InputType.TYPE_CLASS_TEXT);
         builder.setView(input);
@@ -519,35 +522,28 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
             public void onClick(DialogInterface dialog, int which) {
                 description = input.getText().toString();
                 newArea.setDescription(description);
-
                 List<List<Position>> positions = new ArrayList<>();
                 positions.add(new ArrayList<Position>());
                 PolygonOptions polygonOptions = new PolygonOptions();
-
                 for (LatLng point: options.getPoints()) {
                     positions.get(0).add(Position.fromCoordinates(point.getLongitude(), point.getLatitude(),
                             point.getAltitude()));
                     polygonOptions.add(point);
                 }
-
-
                 List<Feature> features = new ArrayList<>();
-
                 features.add(Feature.fromGeometry(Polygon.fromCoordinates(positions)));
                 FeatureCollection featureCollection = FeatureCollection.fromFeatures(features);
-
                 newArea.setFeatureCollection(featureCollection.toJson());
-
                 mainDatabase.insertArea(newArea);
-
                 mapboxMap.addPolygon(polygonOptions);
                 mapboxMap.removePolyline(options.getPolyline());
             }
         });
+
         builder.setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
-                dialog.cancel();
+                dialog.dismiss();
                 mapboxMap.removePolyline(options.getPolyline());
             }
         });
@@ -635,7 +631,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      */
     @Override
     public void onMyLocationChange(@Nullable Location location) {
-        if (pathTrackingEnabled && location != null && trackingServiceStarted == false) {
+        if (pathTrackingEnabled && !trackingServiceStarted && location != null) {
             LatLng currentPosition = getLatLng(location);
             options.add(currentPosition);
         }
