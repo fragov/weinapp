@@ -11,6 +11,10 @@ import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbEndpoint;
 import android.hardware.usb.UsbInterface;
 import android.hardware.usb.UsbManager;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.Message;
 import android.util.Log;
 import android.widget.Toast;
 
@@ -26,23 +30,24 @@ import java.util.Set;
  */
 public class GPS implements GPSDataSender {
 
-    public static final String FAILED_RESULT = "$No Result";
-    public static final String NO_DEVICE = "No device found.";
-    public static final String LCDT = "LogCatDemoTag";
-    public static final String ACTION_USB_PERMISSION = "com.android.example.USB_PERMISSION";
+    private static final String FAILED_RESULT = "$No Result";
+    private static final String NO_DEVICE = "No device found.";
+    private static final String LCDT = "LogCatDemoTag";
+    private static final String ACTION_USB_PERMISSION = "com.android.example.USB_PERMISSION";
 
     private static final ArrayList<DeviceInfoWrapper> possibleDevicesList = new ArrayList<>();
 
     private static GPSDataReceiver gpsDataReceiver;
     private long pollingInterval = -1;
+    private PollingClock pollingClock;
 
-    private LatLng lastKnownLatLng;
+    private LatLng lastKnownLatLng = new LatLng(0,0);
     private boolean hasPos = false;
 
     private byte[] bytes;
     private static final int TIMEOUT = 1000;
     private static final int BUFFLEN = 1024;
-    private int baudRate = 4800;
+    private static final int baudRate = 4800;
 
     private UsbManager manager;
     private UsbDevice device;
@@ -65,7 +70,8 @@ public class GPS implements GPSDataSender {
         public void onReceive(Context context, Intent intent) {
             String action  = intent.getAction();
 
-            loggah("attachReceiver.onReceive()",true);
+            loggah("attachReceiver.onReceive()",false);
+            loggah("USB device attached.", true);
 
             if(UsbManager.ACTION_USB_DEVICE_ATTACHED.equals(action)) {
                 UsbDevice device = (UsbDevice) intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
@@ -87,7 +93,8 @@ public class GPS implements GPSDataSender {
         public void onReceive(Context context, Intent intent) {
             String action  = intent.getAction();
 
-            loggah("detachReceiver.onReceive()",true);
+            loggah("detachReceiver.onReceive()",false);
+            loggah("USB device detached", true);
 
             if(UsbManager.ACTION_USB_DEVICE_DETACHED.equals(action)) {
                 UsbDevice device = (UsbDevice) intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
@@ -108,7 +115,7 @@ public class GPS implements GPSDataSender {
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
 
-            loggah("permissionReceiver.onReceive()",true);
+            loggah("permissionReceiver.onReceive()",false);
 
             if(ACTION_USB_PERMISSION.equals(action)) {
                 synchronized (this) {
@@ -121,6 +128,19 @@ public class GPS implements GPSDataSender {
                         loggah("Permission denied for device.", true);
                     }
                 }
+            }
+        }
+    };
+
+    private final Handler pollHandler = new Handler() {
+        @Override
+        public void handleMessage(Message message) {
+            String res = message.getData().getString("mess");
+            if("gotMess".equals(res)) {
+                updateReceivers();
+            } else {
+                loggah("Almost...", false);
+                updateReceivers();
             }
         }
     };
@@ -141,7 +161,7 @@ public class GPS implements GPSDataSender {
         IntentFilter intentFilter3 = new IntentFilter(UsbManager.ACTION_USB_DEVICE_DETACHED);
         context.registerReceiver(detachReceiver, intentFilter3);
 
-        loggah("Receivers maybe registered.", false);
+        loggah("Receivers registered.", false);
 
         this.onCreate();
     }
@@ -151,12 +171,13 @@ public class GPS implements GPSDataSender {
         return this.lastKnownLatLng;
     }
 
-    private void setLastKnownLatLng() {
+    private synchronized void setLastKnownLatLng() {
         String gga = getFirstGGAString();
         loggah("GGA String - " + gga, false);
-        if(gga.equals(FAILED_RESULT)) //TODO make this;
-        lastKnownLatLng = ggaToLatLng(gga);
-        loggah("Coordinates: " + lastKnownLatLng.getLatitude() + "," + lastKnownLatLng.getLongitude(), false);
+        this.lastKnownLatLng = ggaToLatLng(gga);
+        if(this.lastKnownLatLng != null) {
+            loggah("Coordinates: " + lastKnownLatLng.getLatitude() + "," + lastKnownLatLng.getLongitude(), false);
+        }
     }
 
     public LatLng ggaToLatLng(String gga) {
@@ -200,7 +221,8 @@ public class GPS implements GPSDataSender {
 
         if(toasted) {
             toasterMessage += " found.";
-            loggah(toasterMessage, true);
+            loggah(toasterMessage, false);
+            return null;
         }
         LatLng retVal = new LatLng(lat, lng);
         try {
@@ -208,7 +230,7 @@ public class GPS implements GPSDataSender {
             //TODO don't set wrong altitude, dude
             retVal.setAltitude(alt);
         } catch (NumberFormatException e) {
-            loggah("Time Fail", true);
+            loggah("Time Fail", false);
         }
         return retVal;
     }
@@ -251,7 +273,7 @@ public class GPS implements GPSDataSender {
         }
 
         long now = System.currentTimeMillis() - then;
-        loggah("Reading Time: " + now, true);
+        loggah("Reading Time: " + now, false);
 
         return raw.toString();
     }
@@ -348,6 +370,9 @@ public class GPS implements GPSDataSender {
         isInit = false;
         hasEndpoint = false;
         hasPermission = false;
+        if(this.pollingClock != null) {
+            this.stopPolling();
+        }
     }
 
     public void onDestroy() {
@@ -484,16 +509,13 @@ public class GPS implements GPSDataSender {
         return device != null;
     }
 
+    public boolean isPollerSet() { return this.isPollerSet; }
+
     public void loggah (String mess, boolean toast) {
         Log.d(LCDT, mess);
         if(toast) {
             Toast.makeText(context, mess, Toast.LENGTH_SHORT).show();
         }
-    }
-
-    @Override
-    public GPSDataReceiver getReceiver() {
-        return this.gpsDataReceiver;
     }
 
     @Override
@@ -503,12 +525,17 @@ public class GPS implements GPSDataSender {
     }
 
     @Override
+    public void unRegisterReceiver(GPSDataReceiver gpsDataReceiver) {
+        this.gpsDataReceiver = null;
+    }
+
+    @Override
     public void setPollingInterval(long millis) {
         this.pollingInterval = millis;
     }
 
     @Override
-    public void updateReceivers() {
+    public synchronized void updateReceivers() {
         //we could do this with an ArrayList, but we can only use it once
         this.gpsDataReceiver.onUSBGPSLocationChanged(getLastKnownLatLng());
     }
@@ -516,11 +543,41 @@ public class GPS implements GPSDataSender {
     @Override
     public void startPolling() {
         //TODO human-generated method stub
+        isPollerSet = true;
+
+        //TODO we can make this in setPollingInterval(), too
+        if(this.pollingInterval >= 5000) {
+            this.pollingClock = new PollingClock(this.pollingInterval);
+        } else {
+            this.pollingClock = new PollingClock(5000);
+            Log.i(LCDT, "Polling interval set to 5 seconds.");
+        }
+        if(hasEndpoint) {
+            /*
+            Thread pollingClockThread = new Thread() {
+                public void run() {
+                    handler.post(GPS.this.pollingClock);
+                }
+            };
+            */
+            Thread pollingClockThread = new Thread(this.pollingClock);
+            pollingClockThread.start();
+            loggah("Polling started", true);
+        } else {
+            loggah("Polling start failed.", true);
+            isPollerSet = false;
+        }
     }
 
     @Override
     public void stopPolling() {
         //TODO human-generated method stub
+        if(this.pollingClock != null) {
+            this.pollingClock.stop();
+            loggah("Polling stopped.", true);
+            this.pollingClock = null;
+        }
+        isPollerSet = false;
     }
 
     private class PollingClock implements Runnable{
@@ -535,22 +592,39 @@ public class GPS implements GPSDataSender {
         @Override
         public void run() {
             while(!stopFlag) {
-                //TODO set this in another Thread
-                //GPS.this.setLastKnownLatLng();
+                /*
+                Thread thread = new Thread() {
+                    public void run() {
+                        handler2.post(new Poller());
+                    }
+                };
+                */
+                Thread thread = new Thread(new Poller());
+                //thread.setPriority(Thread.MIN_PRIORITY);
+                thread.start();
                 try {
                     Thread.sleep(this.wait);
-                    //if errors, try
-                    //this.wait(this.wait);
                 } catch (InterruptedException e) {
                     Log.e(LCDT, "Couldn't wait in PollingClock.");
                     this.stop();
                 }
-                updateReceivers();
             }
         }
 
         public void stop () {
             this.stopFlag = true;
+        }
+    }
+
+    private class Poller implements Runnable {
+        @Override
+        public void run() {
+            GPS.this.setLastKnownLatLng();
+            Message mess = pollHandler.obtainMessage();
+            Bundle b = new Bundle();
+            b.putString("mess", "gotMess");
+            mess.setData(b);
+            pollHandler.sendMessage(mess);
         }
     }
 }

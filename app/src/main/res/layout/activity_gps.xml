@@ -33,4 +33,11 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:hint="Time"/>
+
+    <Button
+        android:id="@+id/multithreadToaster"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="multithread toasting"/>
 </LinearLayout>

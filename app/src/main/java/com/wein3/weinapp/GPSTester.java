@@ -14,6 +14,7 @@ public class GPSTester extends AppCompatActivity implements GPSDataReceiver {
     private TextView textViewLat;
     private TextView textViewLong;
     private TextView satTime;
+    private Button multithreadToaster;
 
     private GPS gps;
 
@@ -26,8 +27,12 @@ public class GPSTester extends AppCompatActivity implements GPSDataReceiver {
         textViewLat = (TextView) findViewById(R.id.textViewLat);
         textViewLong = (TextView) findViewById(R.id.textViewLong);
         satTime = (TextView) findViewById(R.id.satTime);
+        multithreadToaster = (Button) findViewById(R.id.multithreadToaster);
 
         gps = new GPS(this);
+        gps.registerReceiver(this);
+        gps.setPollingInterval(10000);
+        gps.startPolling();
 
         getLatLong.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -42,8 +47,20 @@ public class GPSTester extends AppCompatActivity implements GPSDataReceiver {
                 }
 
                 //don't use that when my awesome Observer thingy is implemented
-                LatLng res = gps.getLastKnownLatLng();
-                GPSTester.this.onUSBGPSLocationChanged(res);
+                if(!gps.isPollerSet()) {
+                    //LatLng res = gps.getLastKnownLatLng();
+                    //GPSTester.this.onUSBGPSLocationChanged(res);
+                    gps.startPolling();
+                } else {
+                    gps.stopPolling();
+                }
+            }
+        });
+
+        multithreadToaster.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                loggah("Multithread toasted.", true);
             }
         });
     }
@@ -59,17 +76,16 @@ public class GPSTester extends AppCompatActivity implements GPSDataReceiver {
     }
 
     @Override
-    public void setReceiver() {
-        if(gps != null) {
-            gps.registerReceiver(this);
-            gps.setPollingInterval(5000);
-        }
-    }
-
-    @Override
     public void onUSBGPSLocationChanged(LatLng location) {
-        textViewLat.setText(Double.toString(location.getLatitude()));
-        textViewLong.setText(Double.toString(location.getLongitude()));
-        satTime.setText(Double.toString(location.getAltitude()));
+        if(location != null) {
+            textViewLat.setText(Double.toString(location.getLatitude()));
+            textViewLong.setText(Double.toString(location.getLongitude()));
+            satTime.setText(Double.toString(location.getAltitude()));
+        } else {
+            //loggah("No GPS.", true);
+            textViewLat.setText("FAILz");
+            textViewLong.setText("FAILz");
+            satTime.setText("FAILz");
+        }
     }
 }
