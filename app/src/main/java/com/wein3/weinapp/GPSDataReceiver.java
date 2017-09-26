@@ -7,6 +7,5 @@ import com.mapbox.mapboxsdk.geometry.LatLng;
  */
 
 public interface GPSDataReceiver {
-    public void setReceiver();
     public void onUSBGPSLocationChanged(LatLng location);
 }

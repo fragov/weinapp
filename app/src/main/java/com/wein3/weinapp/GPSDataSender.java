@@ -5,10 +5,10 @@ package com.wein3.weinapp;
  */
 
 public interface GPSDataSender {
-    public GPSDataReceiver getReceiver();
     public void registerReceiver(GPSDataReceiver gpsDataReceiver);
+    public void unRegisterReceiver(GPSDataReceiver gpsDataReceiver);
     public void setPollingInterval(long millis);
-    public void updateReceivers();
     public void startPolling();
+    public void updateReceivers();
     public void stopPolling();
 }
