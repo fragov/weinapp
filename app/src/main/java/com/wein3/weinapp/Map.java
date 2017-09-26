@@ -103,12 +103,41 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      */
     private HelperDatabase helperDatabase;
 
+    /**
+     * MapView containing the map.
+     */
     private MapView mapView;
+
+    /**
+     * MapboxMap instance managing the map.
+     */
     private MapboxMap mapboxMap;
-    private PolylineOptions options;
-    private FloatingActionButton fabLocation;
-    private FloatingActionButton fabPath;
+
+    /**
+     * PolylineOptions instance representing the coordinates of the path on the map.
+     */
+    private PolylineOptions polylineOptions;
+
+    /**
+     * Polyline instance representing the actual path on the map.
+     */
+    private Polyline currentPolyline;
+
+    /**
+     * Get LocationManager to manage the built-in GPS provider.
+     */
     private LocationManager locationManager;
+
+    /**
+     * FloatingActionButton to move the camera to the current location.
+     */
+    private FloatingActionButton fabLocation;
+
+    /**
+     * FloatingActionButton to enable or disable path tracking.
+     */
+    private FloatingActionButton fabPath;
+
 
     private String description;
     private Area newArea;
@@ -134,6 +163,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         helperDatabase = new HelperDatabase();
         helperDatabase.init(this);
 
+        // initialize LocationManager
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
 
         // set Toolbar
@@ -155,7 +185,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                 this, drawer, toolbar, R.string.navigation_drawer_open, R.string.navigation_drawer_close);
         drawer.addDrawerListener(toggle);
         toggle.syncState();
-
         NavigationView navigationView = (NavigationView) findViewById(R.id.nav_view);
         navigationView.setNavigationItemSelectedListener(this);
 
@@ -171,6 +200,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
             }
         }
 
+        // create MapView instance
         mapView = (MapView) findViewById(R.id.mapView);
         mapView.onCreate(savedInstanceState);
 
@@ -180,6 +210,13 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
             public void onMapReady(MapboxMap mbMap) {
                 // get Mapbox map instance
                 mapboxMap = mbMap;
+                // add the recently saved polyline from the database
+                polylineOptions = new PolylineOptions();
+                List<LatLng> coordinates = helperDatabase.getCurrentPath();
+                for (LatLng position : coordinates) {
+                    polylineOptions.add(position);
+                }
+                updatePolyline(polylineOptions);
                 // move compass on the map according to current screen size
                 Display display = getWindowManager().getDefaultDisplay();
                 DisplayMetrics outMetrics = new DisplayMetrics();
@@ -197,8 +234,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                 mapboxMap.setMyLocationEnabled(true);
                 // set listener for future location changes
                 mapboxMap.setOnMyLocationChangeListener(Map.this);
-                // set camera view to its default position
-                mapboxMap.setCameraPosition(CameraPosition.DEFAULT);
                 if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
                     // GPS is enabled, therefore directly move camera to current location
                     Location location = mapboxMap.getMyLocation();
@@ -235,7 +270,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                 String message = intent.getStringExtra("coords");
                 String[] parts = message.split(",");
                 for (int i = 0; i < parts.length - 1; i += 2) {
-                    options.add(new LatLng(Double.parseDouble(parts[i]), Double.parseDouble(parts[i + 1])));
+                    polylineOptions.add(new LatLng(Double.parseDouble(parts[i]), Double.parseDouble(parts[i + 1])));
                 }
             }
         }
@@ -289,8 +324,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     public void onStart() {
         super.onStart();
         mapView.onStart();
-        PolylineOptions polylineOptions = helperDatabase.getCurrentPath();
-        Toast.makeText(getBaseContext(), String.valueOf(polylineOptions.getPoints().size()), Toast.LENGTH_LONG).show();
     }
 
     /**
@@ -328,19 +361,18 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         super.onStop();
         mapView.onStop();
         if (pathTrackingEnabled) {
-            helperDatabase.updateCurrentPath(options);
+            helperDatabase.updateCurrentPath(polylineOptions);
         }
     }
 
     /**
-     * Destroy activity and close databases.
+     * Destroy activity and close database.
      */
     @Override
     protected void onDestroy() {
         super.onDestroy();
         mapView.onDestroy();
         mainDatabase.close();
-        helperDatabase.close();
     }
 
     /**
@@ -387,6 +419,20 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         });
         builder.create();
         builder.show();
+    }
+
+    /**
+     * Replace the current polyline with a new one.
+     *
+     * @param polylineOptions coordinates of the new polyline as PolylineOptions instance
+     */
+    private void updatePolyline(final PolylineOptions polylineOptions) {
+        if (currentPolyline != null) {
+            mapboxMap.removePolyline(currentPolyline);
+        }
+        currentPolyline = mapboxMap.addPolyline(polylineOptions);
+        currentPolyline.setColor(Color.RED);
+        currentPolyline.setWidth(3);
     }
 
     /**
@@ -483,14 +529,12 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         Location location = mapboxMap.getMyLocation();
         if (location != null) {
             // initialize a new polyline
-            options = new PolylineOptions();
+            polylineOptions = new PolylineOptions();
             // add current location as first point to the polyline
             LatLng currentPosition = getLatLng(location);
-            options.add(currentPosition);
-            // add polyline to the map
-            Polyline polyline = mapboxMap.addPolyline(options);
-            polyline.setColor(Color.RED);
-            polyline.setWidth(3);
+            polylineOptions.add(currentPosition);
+            // remove old polyline from the map and add the new one
+            updatePolyline(polylineOptions);
             // enable further GPS tracking
             pathTrackingEnabled = true;
             // set another icon while recording
@@ -525,7 +569,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                 List<List<Position>> positions = new ArrayList<>();
                 positions.add(new ArrayList<Position>());
                 PolygonOptions polygonOptions = new PolygonOptions();
-                for (LatLng point: options.getPoints()) {
+                for (LatLng point: polylineOptions.getPoints()) {
                     positions.get(0).add(Position.fromCoordinates(point.getLongitude(), point.getLatitude(),
                             point.getAltitude()));
                     polygonOptions.add(point);
@@ -536,7 +580,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                 newArea.setFeatureCollection(featureCollection.toJson());
                 mainDatabase.insertArea(newArea);
                 mapboxMap.addPolygon(polygonOptions);
-                mapboxMap.removePolyline(options.getPolyline());
+                mapboxMap.removePolyline(polylineOptions.getPolyline());
             }
         });
 
@@ -544,7 +588,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
             @Override
             public void onClick(DialogInterface dialog, int which) {
                 dialog.dismiss();
-                mapboxMap.removePolyline(options.getPolyline());
+                mapboxMap.removePolyline(polylineOptions.getPolyline());
             }
         });
 
@@ -633,7 +677,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     public void onMyLocationChange(@Nullable Location location) {
         if (pathTrackingEnabled && !trackingServiceStarted && location != null) {
             LatLng currentPosition = getLatLng(location);
-            options.add(currentPosition);
+            polylineOptions.add(currentPosition);
         }
     }
 }

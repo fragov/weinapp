@@ -8,6 +8,9 @@ import android.database.sqlite.SQLiteDatabase;
 import com.mapbox.mapboxsdk.annotations.PolylineOptions;
 import com.mapbox.mapboxsdk.geometry.LatLng;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Database handler to store the current path in case of accidental destruction of the app.
  */
@@ -18,24 +21,25 @@ public class HelperDatabase {
     private final String TABLE = "current_path";
 
     /**
-     * Initialize temporary database.
+     * Open or create helper database.
+     * Create a table with two rows, one for latitude and the other for longitude.
      *
      * @param activity current Activity instance
      */
-    public void init(Activity activity) {
+    public void init(final Activity activity) {
         String path = activity.getFilesDir().getParent();
         sqLiteDatabase = SQLiteDatabase.openOrCreateDatabase(path + "/" + DATABASE_FILE, null);
-        sqLiteDatabase.execSQL("CREATE TABLE IF NOT EXISTS " + TABLE + "(latitude REAL, longitude REAL);");
+        sqLiteDatabase.execSQL("CREATE TABLE IF NOT EXISTS " + TABLE + "(latitude REAL NOT NULL, longitude REAL NOT NULL);");
     }
 
     /**
-     * Replace the recently saved path with a new one.
+     * Replace the recently saved path with the specified one.
      *
      * @param options PolylineOptions instance which should be stored
      */
-    public void updateCurrentPath(PolylineOptions options) {
+    public void updateCurrentPath(final PolylineOptions options) {
         if (options != null) {
-            sqLiteDatabase.execSQL("DELETE FROM " + TABLE);
+            deleteCurrentPath();
             for (LatLng position : options.getPoints()) {
                 ContentValues values = new ContentValues();
                 values.put("latitude", position.getLatitude());
@@ -46,22 +50,30 @@ public class HelperDatabase {
     }
 
     /**
+     * Delete the recently saved path.
+     */
+    public void deleteCurrentPath() {
+        sqLiteDatabase.execSQL("DELETE FROM " + TABLE);
+    }
+
+    /**
      * Get the recently saved path.
      *
-     * @return PolylineOptions instance representing the path
+     * @return List of LatLng instances representing the path
      */
-    public PolylineOptions getCurrentPath() {
-        PolylineOptions options = new PolylineOptions();
+    public List<LatLng> getCurrentPath() {
+        List<LatLng> coordinates = new ArrayList<>();
         Cursor cursor = sqLiteDatabase.query(TABLE, null, null, null, null, null, null);
         if (cursor.moveToFirst()) {
             do {
                 double latitude = cursor.getDouble(0);
                 double longitude = cursor.getDouble(1);
                 LatLng position = new LatLng(latitude, longitude);
-                options.add(position);
+                coordinates.add(position);
             } while (cursor.moveToNext());
         }
-        return options;
+        cursor.close();
+        return coordinates;
     }
 
     /**
