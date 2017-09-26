@@ -66,7 +66,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     /**
      * Default zoom factor.
      */
-    private final float DEFAULT_ZOOM_FACTOR = 16;
+    private final double DEFAULT_ZOOM_FACTOR = 16;
 
     /**
      * Default camera animation length (long).
@@ -84,14 +84,35 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     private final int REQUEST_CODE_LOCATION_SOURCE_SETTINGS = 0;
 
     /**
+     * Key to store the path tracking flag.
+     */
+    private final String KEY_INSTANCE_STATE_PATH_TRACKING_ENABLED = "path_tracking_enabled";
+
+    /**
+     * Key to store the path tracking flag.
+     */
+    private final String KEY_INSTANCE_STATE_TRACKING_SERVICE_STARTED = "tracking_service_started";
+
+    /**
+     * Key to store the zoom factor.
+     */
+    private final String KEY_INSTANCE_STATE_ZOOM_FACTOR = "zoom_factor";
+
+    /**
      * Boolean flag indicating whether or not GPS tracking of one's current path is enabled.
      */
-    private boolean pathTrackingEnabled = false;
+    private boolean pathTrackingEnabled;
 
     /**
      * Boolean flag indicating whether or not GPS tracking service is started.
      */
-    private boolean trackingServiceStarted = false;
+    private boolean trackingServiceStarted;
+
+    /**
+     * Zoom factor of camera.
+     * Negative values indicate that the zoom factor is not set.
+     */
+    private double zoomFactor;
 
     /**
      * Database handler to store polygons.
@@ -151,9 +172,23 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // initialize activity
         super.onCreate(savedInstanceState);
         Mapbox.getInstance(this, getString(R.string.access_token));
         setContentView(R.layout.activity_map);
+
+        // reset instance state from Bundle
+        if (savedInstanceState != null) {
+            // restore attribute values from saved state
+            pathTrackingEnabled = savedInstanceState.getBoolean(KEY_INSTANCE_STATE_PATH_TRACKING_ENABLED);
+            trackingServiceStarted = savedInstanceState.getBoolean(KEY_INSTANCE_STATE_TRACKING_SERVICE_STARTED);
+            zoomFactor = savedInstanceState.getDouble(KEY_INSTANCE_STATE_ZOOM_FACTOR);
+        } else {
+            // initialize attributes with default values
+            pathTrackingEnabled = false;
+            trackingServiceStarted = false;
+            zoomFactor = -1;
+        }
 
         // create or open main database
         mainDatabase = new Sqlite();
@@ -173,8 +208,12 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
 
         // set FloatingActionButtons
         fabPath = (FloatingActionButton) findViewById(R.id.fabPath);
-        fabPath.setImageResource(R.drawable.ic_record);
         fabPath.setOnClickListener(this);
+        if (pathTrackingEnabled) {
+            fabPath.setImageResource(R.drawable.ic_stop);
+        } else {
+            fabPath.setImageResource(R.drawable.ic_record);
+        }
         fabLocation = (FloatingActionButton) findViewById(R.id.fabLocation);
         fabLocation.setOnClickListener(this);
         fabLocation.setImageResource(R.drawable.ic_gps);
@@ -234,17 +273,22 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                 mapboxMap.setMyLocationEnabled(true);
                 // set listener for future location changes
                 mapboxMap.setOnMyLocationChangeListener(Map.this);
+                // check if GPS provider is enabled
                 if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
                     // GPS is enabled, therefore directly move camera to current location
                     Location location = mapboxMap.getMyLocation();
-                    moveCamera(location, DEFAULT_ZOOM_FACTOR, CAMERA_ANIMATION_LONG);
+                    if (zoomFactor >= 0) {
+                        CameraPosition cameraPosition = new CameraPosition.Builder().target(getLatLng(location)).zoom(zoomFactor).build();
+                        mapboxMap.setCameraPosition(cameraPosition);
+                    } else {
+                        moveCamera(location, DEFAULT_ZOOM_FACTOR, CAMERA_ANIMATION_LONG);
+                    }
                 } else {
                     // GPS is not enabled, therefore show corresponding
                     // dialog asking to enable GPS signal
                     showGPSDisabledDialog();
                 }
-
-                for(String id: mainDatabase.getListOfAreas().keySet()) {
+                for (String id : mainDatabase.getListOfAreas().keySet()) {
                     Area area = mainDatabase.getAreaById(id);
                     try {
                         GeoJsonSource geoJsonSource = new GeoJsonSource(area.getId(), area.getFeatureCollection());
@@ -266,7 +310,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         @Override
         public void onReceive(Context context, Intent intent) {
             // Get extra data included in the Intent
-            if(pathTrackingEnabled) {
+            if (pathTrackingEnabled) {
                 String message = intent.getStringExtra("coords");
                 String[] parts = message.split(",");
                 for (int i = 0; i < parts.length - 1; i += 2) {
@@ -346,7 +390,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     public void onPause() {
         super.onPause();
         mapView.onPause();
-        if(pathTrackingEnabled) {
+        if (pathTrackingEnabled) {
             Intent intent = new Intent(this, TrackingService.class);
             startService(intent);
             trackingServiceStarted = true;
@@ -363,6 +407,8 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         if (pathTrackingEnabled) {
             helperDatabase.updateCurrentPath(polylineOptions);
         }
+        StatusVariables statusVariables = new StatusVariables(pathTrackingEnabled, mapboxMap.getCameraPosition().zoom);
+        helperDatabase.updateStatus(statusVariables);
     }
 
     /**
@@ -372,7 +418,10 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     protected void onDestroy() {
         super.onDestroy();
         mapView.onDestroy();
-        mainDatabase.close();
+        if (!pathTrackingEnabled) {
+            mainDatabase.close();
+            helperDatabase.close();
+        }
     }
 
     /**
@@ -385,14 +434,17 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     }
 
     /**
-     * save instance state of activity
+     * Save the current state of the activity.
      *
-     * @param outState
+     * @param savedInstanceState Bundle containing all status variables
      */
     @Override
-    public void onSaveInstanceState(Bundle outState) {
-        super.onSaveInstanceState(outState);
-        mapView.onSaveInstanceState(outState);
+    public void onSaveInstanceState(Bundle savedInstanceState) {
+        savedInstanceState.putBoolean(KEY_INSTANCE_STATE_PATH_TRACKING_ENABLED, pathTrackingEnabled);
+        savedInstanceState.putBoolean(KEY_INSTANCE_STATE_TRACKING_SERVICE_STARTED, trackingServiceStarted);
+        savedInstanceState.putDouble(KEY_INSTANCE_STATE_ZOOM_FACTOR, mapboxMap.getCameraPosition().zoom);
+        super.onSaveInstanceState(savedInstanceState);
+        mapView.onSaveInstanceState(savedInstanceState);
     }
 
     /**
@@ -458,7 +510,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      * @param zoomFactor      chosen zoom factor
      * @param animationLength chosen length of the animation in milliseconds
      */
-    private void moveCamera(final Location location, final float zoomFactor, final int animationLength) {
+    private void moveCamera(final Location location, final double zoomFactor, final int animationLength) {
         LatLng currentPosition = getLatLng(location);
         moveCamera(currentPosition, zoomFactor, animationLength);
     }
@@ -472,7 +524,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      * @param zoomFactor      chosen zoom factor
      * @param animationLength chosen length of the animation in milliseconds
      */
-    private void moveCamera(final LatLng position, final float zoomFactor, final int animationLength) {
+    private void moveCamera(final LatLng position, final double zoomFactor, final int animationLength) {
         if (position != null) {
             CameraPosition cameraPosition;
             if (zoomFactor >= 0) {
@@ -522,7 +574,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     }
 
     /**
-     * Starts printing the GPS coordinates onto the map.
+     * Start printing the GPS coordinates onto the map.
      * Do nothing if the current position cannot be determined.
      */
     private void startNewRoute() {
@@ -545,7 +597,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     }
 
     /**
-     * Stops tracking of the GPS coordinates.
+     * Stop tracking of the GPS coordinates.
      */
     private void stopCurrentRoute() {
         // disable further GPS tracking
@@ -569,7 +621,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                 List<List<Position>> positions = new ArrayList<>();
                 positions.add(new ArrayList<Position>());
                 PolygonOptions polygonOptions = new PolygonOptions();
-                for (LatLng point: polylineOptions.getPoints()) {
+                for (LatLng point : polylineOptions.getPoints()) {
                     positions.get(0).add(Position.fromCoordinates(point.getLongitude(), point.getLatitude(),
                             point.getAltitude()));
                     polygonOptions.add(point);
@@ -636,7 +688,11 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
             case R.id.fabLocation:
                 Location location = mapboxMap.getMyLocation();
                 if (location != null) {
-                    moveCamera(location, CAMERA_ANIMATION_SHORT);
+                    if (mapboxMap.getCameraPosition().zoom == 0) {
+                        moveCamera(location, DEFAULT_ZOOM_FACTOR, CAMERA_ANIMATION_LONG);
+                    } else {
+                        moveCamera(location, CAMERA_ANIMATION_SHORT);
+                    }
                 } else {
                     Toast.makeText(Map.this, R.string.gps_not_available, Toast.LENGTH_SHORT).show();
                 }
