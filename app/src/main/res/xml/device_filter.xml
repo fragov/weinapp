@@ -1,11 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 
+<!--Here are the devices recognizable by the intent filter.-->
+
 <resources>
-    <!--
-    <usb-device vendor-id="067B" product-id="1234" class="255" subclass="66" protocol="1"/>
-    -->
+    <!--Device: Navilock NL-650US; GPS: MediaTek MT3337; RS-232 to USB: Prolific PL-2303 HXD-->
     <usb-device vendor-id="067B" product-id="8963"/>
-    <!--
-    <usb-device vendor-id="067B" product-id="2303"/>
-    -->
 </resources>

@@ -8,6 +8,10 @@ import android.widget.TextView;
 
 import com.mapbox.mapboxsdk.geometry.LatLng;
 
+/**
+ * This Activity has no explanation because we won't need this in our finished application.
+ * For now, it's just a simple way to test the GPS class.
+ */
 public class GPSTester extends AppCompatActivity implements GPSDataReceiver {
 
     private Button getLatLong;
@@ -46,10 +50,12 @@ public class GPSTester extends AppCompatActivity implements GPSDataReceiver {
                     return;
                 }
 
-                //don't use that when my awesome Observer thingy is implemented
                 if(!gps.isPollerSet()) {
+                    //don't use that when my awesome Observer thingy is implemented
                     //LatLng res = gps.getLastKnownLatLng();
                     //GPSTester.this.onUSBGPSLocationChanged(res);
+
+
                     gps.startPolling();
                 } else {
                     gps.stopPolling();

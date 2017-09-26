@@ -13,7 +13,6 @@ import android.hardware.usb.UsbInterface;
 import android.hardware.usb.UsbManager;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.Looper;
 import android.os.Message;
 import android.util.Log;
 import android.widget.Toast;
@@ -26,45 +25,153 @@ import java.util.Iterator;
 import java.util.Set;
 
 /**
+ * This class should provide everything necessary for an Activity to receive GPS data from
+ * a USB GPS device.
+ *
  * TODO consider turning this into a singleton
+ *
+ * TODO check for consistency in checking device, connection, etc.
+ *
+ * TODO handle detachment when Threads are still running
+ *
+ * TODO reduce time to read data (especially with no reception) because only one GGA/sec from sensor
+ *
+ * TODO look at log.txt on Desktop for random, weirdly corrupted and error-causing examples...
  */
 public class GPS implements GPSDataSender {
 
+    //-------------FINAL VARIABLES------------------------------------------------------------------
+
+    /**
+     * String to test for wrong result when extracting NMEA sentences.
+     */
     private static final String FAILED_RESULT = "$No Result";
+
+    /**
+     * String to give back if no device was found.
+     */
     private static final String NO_DEVICE = "No device found.";
+
+    /**
+     * A tag for finding things in the log.
+     */
     private static final String LCDT = "LogCatDemoTag";
+
+    /**
+     * Name of the Action of the Intent which should be received by permissionReceiver.
+     */
     private static final String ACTION_USB_PERMISSION = "com.android.example.USB_PERMISSION";
 
+    /**
+     * A static list to check for supported devices.
+     */
     private static final ArrayList<DeviceInfoWrapper> possibleDevicesList = new ArrayList<>();
 
+    //-------------VARIABLES RELATED TO MULTITHREADING AND DATA TRANSFER----------------------------
+
+    /**
+     * This is the GPSDataReceiver which receives updates if the location has changed.
+     *
+     * TODO can be replaced with a List of GPSDataReceivers in the future
+     */
     private static GPSDataReceiver gpsDataReceiver;
+
+    /**
+     * Variable where the polling interval is stored (in milliseconds).
+     */
     private long pollingInterval = -1;
+
+    /**
+     * Variable for access to the PollingClock Runnable.
+     */
     private PollingClock pollingClock;
 
-    private LatLng lastKnownLatLng = new LatLng(0,0);
-    private boolean hasPos = false;
+    /**
+     * This is used to store the last known location.
+     */
+    private LatLng lastKnownLatLng;
 
+    //-------------VARIABLES RELATED TO USB CONNECTION AND DATA READING-----------------------------
+
+    /**
+     * Buffer for the read data.
+     */
     private byte[] bytes;
+
+    /**
+     * Reading timeout.
+     */
     private static final int TIMEOUT = 1000;
+
+    /**
+     * Buffer length (important to consider if read freshest data has to be read).
+     */
     private static final int BUFFLEN = 1024;
+
+    /**
+     * Technical stuff to receive the right characters.
+     */
     private static final int baudRate = 4800;
 
+    /**
+     * Use this to get devices an establish a connection.
+     */
     private UsbManager manager;
+
+    /**
+     * This this the GPS USB device in use.
+     */
     private UsbDevice device;
 
-    private UsbInterface intf;
+    /**
+     * This represents the connection to the device.
+     */
     private UsbDeviceConnection connection;
+
+    /**
+     * Technical stuff.
+     */
+    private UsbInterface intf;
+
+    /**
+     * Technical stuff
+     */
     private UsbEndpoint endpoint;
 
+    //-------------FLAGS TO REPRESENT CURRENT STATE-------------------------------------------------
+
+    /**
+     * true, if connection is initialized.
+     */
     private boolean isInit = false;
+
+    /**
+     * true, if we have an endpoint. Important to know before trying to read data.
+     */
     private boolean hasEndpoint = false;
+
+    /**
+     * check if we currently receive updates from the poller
+     */
     private boolean isPollerSet = false;
 
-    //TODO use Android to get this information
+    /**
+     * This indicates if there is a permission to access the USB device.
+     *
+     * TODO this is a simple way, but I should use Android to get this information
+     */
     private boolean hasPermission = false;
 
+    //-------------APPLICATION STUFF----------------------------------------------------------------
+
+    /**
+     * This is not an Activity, so a context has to be stored somewhere.
+     */
     private Context context;
 
+    /**
+     * This BroadcastReceiver is used to detect if a USB device is attached.
+     */
     private final BroadcastReceiver attachReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -88,6 +195,9 @@ public class GPS implements GPSDataSender {
         }
     };
 
+    /**
+     * This BroadcastReceiver is used to detect if a USB device is detached.
+     */
     private final BroadcastReceiver detachReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -110,6 +220,10 @@ public class GPS implements GPSDataSender {
         }
     };
 
+    /**
+     * This BroadcastReceiver is used to establish a connection if the permission to access the
+     * USB device was granted.
+     */
     private final BroadcastReceiver permissionReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -132,6 +246,11 @@ public class GPS implements GPSDataSender {
         }
     };
 
+    /**
+     * This handler is used to receive Messages from the Poller Runnable.
+     *
+     * TODO use other Android-specific solutions to use something like this for multiple Poller instances
+     */
     private final Handler pollHandler = new Handler() {
         @Override
         public void handleMessage(Message message) {
@@ -145,9 +264,20 @@ public class GPS implements GPSDataSender {
         }
     };
 
+    //-------------CONSTRUCTOR----------------------------------------------------------------------
+
+    /**
+     * Most important tasks of this constructor are:
+     *      -getting the UsbManager
+     *      -register the BroadcastReceivers
+     *
+     * @param context - stores the context we need to access for certain methods
+     */
     public GPS(Context context) {
         this.context = context;
 
+        //Set supported devices list.
+        //Device: Navilock NL-650US; GPS: MediaTek MT3337; RS-232 to USB: Prolific PL-2303 HXD
         possibleDevicesList.add(new DeviceInfoWrapper(0x067B, 0x2303));
 
         manager = (UsbManager) context.getSystemService(Context.USB_SERVICE);
@@ -521,7 +651,9 @@ public class GPS implements GPSDataSender {
     @Override
     public void registerReceiver(GPSDataReceiver gpsDataReceiver) {
         //we could do this with an ArrayList, but we can only use it once
-        this.gpsDataReceiver = gpsDataReceiver;
+        if(this.gpsDataReceiver == null) {
+            this.gpsDataReceiver = gpsDataReceiver;
+        }
     }
 
     @Override
@@ -531,7 +663,12 @@ public class GPS implements GPSDataSender {
 
     @Override
     public void setPollingInterval(long millis) {
-        this.pollingInterval = millis;
+        if(millis > 9999) {
+            this.pollingInterval = millis;
+        } else {
+            this.pollingInterval = 10000;
+            Log.i(LCDT, "Polling interval set to 10 seconds.");
+        }
     }
 
     @Override
@@ -541,16 +678,15 @@ public class GPS implements GPSDataSender {
     }
 
     @Override
-    public void startPolling() {
+    public boolean startPolling() {
         //TODO human-generated method stub
         isPollerSet = true;
 
-        //TODO we can make this in setPollingInterval(), too
-        if(this.pollingInterval >= 5000) {
+        if(this.pollingInterval > 9999) {
             this.pollingClock = new PollingClock(this.pollingInterval);
         } else {
-            this.pollingClock = new PollingClock(5000);
-            Log.i(LCDT, "Polling interval set to 5 seconds.");
+            this.pollingClock = new PollingClock(10000);
+            Log.i(LCDT, "Polling interval set to 10 seconds.");
         }
         if(hasEndpoint) {
             /*
@@ -563,9 +699,12 @@ public class GPS implements GPSDataSender {
             Thread pollingClockThread = new Thread(this.pollingClock);
             pollingClockThread.start();
             loggah("Polling started", true);
+            return true;
         } else {
             loggah("Polling start failed.", true);
             isPollerSet = false;
+            return false;
+            //TODO don't use return values. Work out repeat strategy in this class
         }
     }
 
