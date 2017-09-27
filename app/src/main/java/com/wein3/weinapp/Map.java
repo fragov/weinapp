@@ -2,6 +2,9 @@ package com.wein3.weinapp;
 
 import android.Manifest;
 import android.app.AlertDialog;
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -11,6 +14,7 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.location.Location;
+import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Bundle;
 import android.provider.Settings;
@@ -63,7 +67,7 @@ import java.util.List;
 /**
  * Main activity containing the map.
  */
-public class Map extends AppCompatActivity implements View.OnClickListener, NavigationView.OnNavigationItemSelectedListener, MapboxMap.OnMyLocationChangeListener {
+public class Map extends AppCompatActivity implements View.OnClickListener, NavigationView.OnNavigationItemSelectedListener {
 
     /**
      * Default zoom factor.
@@ -99,7 +103,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      * Key for the Map activity's SharedPreferences.
      */
     private final String KEY_SHARED_PREFERENCES_MAP = "map_shared_preferences";
-    
+
     /**
      * Boolean flag indicating whether or not GPS tracking of one's current path is enabled.
      */
@@ -164,6 +168,9 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
 
     private String description;
     private Area newArea;
+    private LatLng currentLatLng;
+    private NotificationManager nManager;
+    private int NOTIFICATION = R.string.local_service_started;
 
     /**
      * Create activity and instantiate views and global variables.
@@ -192,6 +199,10 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
 
         // initialize LocationManager
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        nManager = (NotificationManager)getSystemService(NOTIFICATION_SERVICE);
+
+        Intent intent = new Intent(this, TrackingService.class);
+        startService(intent);
 
         // set Toolbar
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
@@ -264,8 +275,9 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                 // enable plotting of current (or last known) location
                 mapboxMap.setMyLocationEnabled(true);
                 // set listener for future location changes
-                mapboxMap.setOnMyLocationChangeListener(Map.this);
-                // check if GPS provider is enabled
+                //mapboxMap.setOnMyLocationChangeListener(Map.this);
+                // set camera view to its default position
+                mapboxMap.setCameraPosition(CameraPosition.DEFAULT);
                 if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
                     // GPS is enabled, therefore directly move camera to current location
                     Location location = mapboxMap.getMyLocation();
@@ -302,13 +314,19 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         @Override
         public void onReceive(Context context, Intent intent) {
             // Get extra data included in the Intent
-            if (pathTrackingEnabled) {
-                String message = intent.getStringExtra("coords");
-                String[] parts = message.split(",");
-                for (int i = 0; i < parts.length - 1; i += 2) {
-                    polylineOptions.add(new LatLng(Double.parseDouble(parts[i]), Double.parseDouble(parts[i + 1])));
-                }
+            double x = intent.getDoubleExtra("Latitude", 0);
+            double y = intent.getDoubleExtra("Longitude", 0);
+
+            currentLatLng = new LatLng(x, y);
+            if(pathTrackingEnabled) {
+                polylineOptions.add(currentLatLng);
             }
+
+            /*String[] parts = message.split(",");
+            for (int i = 0; i < parts.length - 1; i += 2) {
+                Map.this.options.add(new LatLng(Double.parseDouble(parts[i]), Double.parseDouble(parts[i + 1])));
+            }*/
+            //}
         }
     };
 
@@ -369,9 +387,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     public void onResume() {
         super.onResume();
         mapView.onResume();
-        Intent intent = new Intent(this, TrackingService.class);
-        stopService(intent);
-        trackingServiceStarted = false;
     }
 
     /**
@@ -382,11 +397,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     public void onPause() {
         super.onPause();
         mapView.onPause();
-        if (pathTrackingEnabled) {
-            Intent intent = new Intent(this, TrackingService.class);
-            startService(intent);
-            trackingServiceStarted = true;
-        }
     }
 
     /**
@@ -586,15 +596,18 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      * Do nothing if the current position cannot be determined.
      */
     private void startNewRoute() {
-        Location location = mapboxMap.getMyLocation();
-        if (location != null) {
+        if (currentLatLng != null) {
+            showRecordingNotification();
+            Log.d("X wert: ", currentLatLng.getLatitude() + " ");
+            Log.d("Y wert: ", currentLatLng.getLongitude() + " ");
             // initialize a new polyline
             polylineOptions = new PolylineOptions();
             // add current location as first point to the polyline
-            LatLng currentPosition = getLatLng(location);
-            polylineOptions.add(currentPosition);
-            // remove old polyline from the map and add the new one
-            updatePolyline(polylineOptions);
+            polylineOptions.add(currentLatLng);
+            // add polyline to the map
+            Polyline polyline = mapboxMap.addPolyline(polylineOptions);
+            polyline.setColor(Color.RED);
+            polyline.setWidth(3);
             // enable further GPS tracking
             pathTrackingEnabled = true;
             // set another icon while recording
@@ -612,6 +625,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         pathTrackingEnabled = false;
         // reset the original icon
         fabPath.setImageResource(R.drawable.ic_record);
+        nManager.cancel(NOTIFICATION);
 
         newArea = new Area();
 
@@ -683,6 +697,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     public void onClick(View v) {
         switch (v.getId()) {
             case R.id.fabPath:
+                trackingServiceStarted = true;
                 if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
                     if (pathTrackingEnabled) {
                         stopCurrentRoute();
@@ -724,6 +739,11 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                 break;
             case R.id.Action2:
                 startActivity(new Intent(Map.this, DBContent.class));
+                break;
+            case R.id.Action3:
+                Intent intent = new Intent(this, TrackingService.class);
+                stopService(intent);
+
         }
 
         DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
@@ -731,17 +751,22 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         return true;
     }
 
-    /**
-     * Called when the location of the My Location view has changed
-     * (be it latitude/longitude, bearing or accuracy).
-     *
-     * @param location The current location of the My Location view The type of map change event.
-     */
-    @Override
-    public void onMyLocationChange(@Nullable Location location) {
-        if (pathTrackingEnabled && !trackingServiceStarted && location != null) {
-            LatLng currentPosition = getLatLng(location);
-            polylineOptions.add(currentPosition);
-        }
+    private void showRecordingNotification() {
+        // The PendingIntent to launch our activity if the user selects this notification
+        PendingIntent contentIntent = PendingIntent.getActivity(this, 0,
+                new Intent(this, Map.class), 0);
+
+        // Set the info for the views that show in the notification panel.
+        Notification notification = new Notification.Builder(this)
+                .setSmallIcon(R.drawable.ic_record)// the status icon
+                .setTicker(getText(R.string.local_service_started))  // the status text
+                .setWhen(System.currentTimeMillis())  // the time stamp
+                .setContentTitle(getText(R.string.local_service_started))  // the label of the entry
+                .setContentIntent(contentIntent)  // The intent to send when the entry is clicked
+                .setOngoing(true)  //makes the swipe of notification impossible
+                .build();
+
+        // Send the notification.
+        nManager.notify(NOTIFICATION, notification);
     }
 }
