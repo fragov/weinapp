@@ -28,7 +28,7 @@ import java.util.Set;
  * This class should provide everything necessary for an Activity to receive GPS data from
  * a USB GPS device.
  *
- * TODO consider turning this into a singleton
+ * TODO change ugly names (onUSBGPSLocationChanged)
  *
  * TODO check for consistency in checking device, connection, etc.
  *
@@ -45,6 +45,8 @@ import java.util.Set;
  * TODO handle crash on removing USB GPS device while Thread is running
  *
  * TODO make GPS useable without restart...
+ *
+ * TODO make more comments than Javadocs
  *
  */
 public class GPS implements GPSDataSender {
@@ -77,6 +79,12 @@ public class GPS implements GPSDataSender {
     private static final ArrayList<DeviceInfoWrapper> possibleDevicesList = new ArrayList<>();
 
     //-------------VARIABLES RELATED TO MULTITHREADING AND DATA TRANSFER----------------------------
+
+    /**
+     * This is the GPS singleton. Singletons are useful if we only want one instance of a class,
+     * like in this case.
+     */
+    private static GPS gpsSingleton;
 
     /**
      * This is the GPSDataReceiver which receives updates if the location has changed.
@@ -181,7 +189,7 @@ public class GPS implements GPSDataSender {
     /**
      * This is not an Activity, so a context has to be stored somewhere.
      */
-    private Context context;
+    private static Context context;
 
     /**
      * This BroadcastReceiver is used to detect if a USB device is attached.
@@ -285,7 +293,7 @@ public class GPS implements GPSDataSender {
      *
      * @param context - stores the context we need to access for certain methods
      */
-    public GPS(Context context) {
+    private GPS(Context context) {
         this.context = context;
 
         //Set supported devices list.
@@ -306,6 +314,22 @@ public class GPS implements GPSDataSender {
         loggah("Receivers registered.", false);
 
         this.onCreate();
+    }
+
+    /**
+     * This method return the instance of GPS. If an instance already exist, just set the context in it.
+     *
+     * @param context - context used by GPS
+     *
+     * @return - reference to instance
+     */
+    public static GPS getInstance(Context context) {
+        if(GPS.gpsSingleton == null) {
+            GPS.gpsSingleton = new GPS(context);
+        } else {
+            GPS.context = context;
+        }
+        return GPS.gpsSingleton;
     }
 
     //-------------READING METHODS------------------------------------------------------------------
@@ -769,6 +793,15 @@ public class GPS implements GPSDataSender {
      */
     public boolean isPollerSet() {
         return this.isPollerSet;
+    }
+
+    /**
+     * Get the possible devices to integrate into UI (maybe);
+     *
+     * @return - possibleDevicesList
+     */
+    public static ArrayList<DeviceInfoWrapper> getPossibleDevicesList() {
+        return GPS.possibleDevicesList;
     }
 
     //-------------INTERFACE METHODS----------------------------------------------------------------

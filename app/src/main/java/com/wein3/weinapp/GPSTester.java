@@ -33,7 +33,7 @@ public class GPSTester extends AppCompatActivity implements GPSDataReceiver {
         satTime = (TextView) findViewById(R.id.satTime);
         multithreadToaster = (Button) findViewById(R.id.multithreadToaster);
 
-        gps = new GPS(this);
+        gps = GPS.getInstance(this);
         gps.registerReceiver(this);
         gps.setPollingInterval(10000);
         gps.startPolling();
