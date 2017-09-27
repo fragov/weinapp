@@ -402,7 +402,7 @@ public class GPS implements GPSDataSender {
      *
      * @return - GGA dataset
      */
-    public String getFirstGGAString() {
+    private String getFirstGGAString() {
         String data = getSomeData();
 
         StringBuilder builder = new StringBuilder();
@@ -459,7 +459,7 @@ public class GPS implements GPSDataSender {
     private boolean hasRead = false;
     private int recLen = 0;
 
-    public byte readFromGPS() throws GPSException {
+    private byte readFromGPS() throws GPSException {
         byte b = 0;
 
         if(readIndex >= readCount) {
@@ -485,18 +485,35 @@ public class GPS implements GPSDataSender {
 
     /**
      * This class was written to easily store and compare important device information.
-     *
-     * TODO make inner Javadocs
      */
     private class DeviceInfoWrapper {
+        /**
+         * This stores the vendor ID.
+         */
         public int vendorId;
+
+        /**
+         * This stores the product ID.
+         */
         public int productId;
 
+        /**
+         * This constructor sets the vendor and product IDs.
+         *
+         * @param vendorId - vendor ID
+         * @param productId - product ID
+         */
         public DeviceInfoWrapper(int vendorId, int productId) {
             this.vendorId = vendorId;
             this.productId = productId;
         }
 
+        /**
+         * This method compares this DeviceInfoWrapper with the given one.
+         *
+         * @param diw - given DeviceInfoWrapper
+         * @return - true if the given device has the same values than this one
+         */
         public boolean equals (DeviceInfoWrapper diw) {
             return ((this.vendorId == diw.vendorId) && (this.productId == diw.productId));
         }
@@ -544,7 +561,7 @@ public class GPS implements GPSDataSender {
     /**
      * Used to close connection, remove device and reset state.
      */
-    public void closit() {
+    private void closit() {
         loggah("Entered closit().", false);
         this.stopPolling();
         if(connection != null) {
@@ -641,12 +658,28 @@ public class GPS implements GPSDataSender {
         }
     }
 
+    /**
+     * Technical stuff required for controlling data Transfer. Wrapper is needed to check for errors.
+     *
+     * @param requestType - noidea lookat connection.controlTransfer()
+     * @param request - noidea lookat connection.controlTransfer()
+     * @param value - noidea lookat connection.controlTransfer()
+     * @param index - noidea lookat connection.controlTransfer()
+     * @param buffer - noidea lookat connection.controlTransfer()
+     * @param lenght - noidea lookat connection.controlTransfer()
+     * @param timeout - noidea lookat connection.controlTransfer()
+     *
+     * @return - a result value to check for errors
+     */
     private int ctWrapper(int requestType, int request, int value, int index, byte[] buffer, int lenght, int timeout) {
         int res = connection.controlTransfer(requestType, request, value, index, buffer, lenght, timeout);
         if(res < 0) Log.e(LCDT, "ctErrorBLABWAAH");
         return res;
     }
 
+    /**
+     * Initialize ports. (noidea lookat)
+     */
     private void resetPorts() {
         byte[] portSet = new byte[7];
         ctWrapper(161, 33, 0, 0, portSet, 7, TIMEOUT);
@@ -661,6 +694,13 @@ public class GPS implements GPSDataSender {
         ctWrapper(161,33,0,0,portSet,7,TIMEOUT);
     }
 
+    //-------------METADATA SECTION-----------------------------------------------------------------
+
+    /**
+     * Get some metadata from the connected device. Useful for debugging...
+     *
+     * @return
+     */
     public String getDeviceMetaData() {
         if(device == null) {
             return NO_DEVICE;
@@ -692,6 +732,11 @@ public class GPS implements GPSDataSender {
         return stringBuilder.toString();
     }
 
+    /**
+     * Get the device list as String. Useful for debugging...
+     *
+     * @return
+     */
     public String getDeviceListToString() {
         HashMap<String, UsbDevice> deviceList = manager.getDeviceList();
         Set<String> set = deviceList.keySet();
@@ -705,18 +750,28 @@ public class GPS implements GPSDataSender {
         return sb.toString();
     }
 
+    //-------------PROVIDE CURRENT STATE TO THE ACTIVITY--------------------------------------------
+
+    /**
+     * Tells the Activity if there is a device. Use this before trying to access GPS-methods...
+     *
+     * @return - true if there is a device
+     */
     public boolean hasDevice() {
         return device != null;
     }
 
-    public boolean isPollerSet() { return this.isPollerSet; }
-
-    public void loggah (String mess, boolean toast) {
-        Log.d(LCDT, mess);
-        if(toast) {
-            Toast.makeText(context, mess, Toast.LENGTH_SHORT).show();
-        }
+    /**
+     * Tells the Activity if a Poller is set. Use this before accessing getLastKnownLatLng().
+     * Please be aware that the direct use of getLastKnownLatLng() is strongly discouraged.
+     *
+     * @return - if a Poller is set
+     */
+    public boolean isPollerSet() {
+        return this.isPollerSet;
     }
+
+    //-------------INTERFACE METHODS----------------------------------------------------------------
 
     @Override
     public void registerReceiver(GPSDataReceiver gpsDataReceiver) {
@@ -811,10 +866,32 @@ public class GPS implements GPSDataSender {
         isPollerSet = false;
     }
 
+    //-------------MULTITHREADING SECTION-----------------------------------------------------------
+
+    /**
+     * Originally, this Runnable was used as a clock that creates a Thread which reads data from the
+     * USB GPS device in a given interval. However, if the reading time is bigger than the interval,
+     * this would cause fatal errors. Therefore, it was changed to calling an Thread and waiting for
+     * that Thread to notify this Thread. Without the fixed interval, the easiest way to get data
+     * would be a single thread with a loop which is doing the whole work. Unfortunately, this won't
+     * work as expected (see the DirectPoller class).
+     */
     private class PollingClock implements Runnable{
+        /**
+         * This is the polling interval.
+         */
         long wait;
+
+        /**
+         * This flag indicates if the loop has to stop.
+         */
         boolean stopFlag;
 
+        /**
+         * This constructor is setting the polling interval and the flag.
+         *
+         * @param time
+         */
         public PollingClock(long time) {
             this.wait = time;
             stopFlag = false;
@@ -842,23 +919,47 @@ public class GPS implements GPSDataSender {
             }
         }
 
+        /**
+         * This method is setting the flag, so there won't be a next loop cycle.
+         */
         public void stop () {
             this.stopFlag = true;
         }
 
+        /**
+         * Wrap the wait() so it's synchronized (somehow important)
+         *
+         * @throws InterruptedException - if thread is interrupted
+         */
         public synchronized void t_lock() throws InterruptedException {
             this.wait();
         }
 
+        /**
+         * Call notify on this Thread.
+         *
+         * TODO chack if synchronized is necessary
+         */
         public synchronized void t_unlock() {
             this.notify();
         }
     }
 
+    /**
+     * This is a Thread to outsource the long data loading work to another Thread than the UI Thread.
+     */
     private class Poller implements Runnable {
 
+        /**
+         * Stores a reference to the calling PollingClock (to call notify())
+         */
         private PollingClock pc;
 
+        /**
+         * This constructor is setting the reference to pc.
+         *
+         * @param pc - reference
+         */
         public Poller(PollingClock pc) {
             this.pc = pc;
         }
@@ -878,13 +979,22 @@ public class GPS implements GPSDataSender {
         }
     }
 
+    /**
+     * The direct Poller is stored here.
+     */
     private DirectPoller directPoller;
 
     /**
+     * This would be the best way to poll data without a fixes interval, but somehow it doesn't work...
+     *
      * TODO : this is the more elegant way, but it doesn't really work...
+     *
+     * TODO make inner Javadocs
      */
     private class DirectPoller implements Runnable {
-
+        /**
+         * This flag indicates if the loop has to stop.
+         */
         private boolean stopFlag = false;
 
         @Override
@@ -902,8 +1012,24 @@ public class GPS implements GPSDataSender {
             }
         }
 
+        /**
+         * This method is setting the flag, so there won't be a next loop cycle.
+         */
         public void stop() {
             this.stopFlag = true;
+        }
+    }
+
+    /**
+     * Write something as a debug message into the log.
+     *
+     * @param mess - message to be logged
+     * @param toast - if true then make a short Toast
+     */
+    public void loggah (String mess, boolean toast) {
+        Log.d(LCDT, mess);
+        if(toast) {
+            Toast.makeText(context, mess, Toast.LENGTH_SHORT).show();
         }
     }
 }
