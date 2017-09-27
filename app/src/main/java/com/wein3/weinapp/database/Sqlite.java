@@ -1,28 +1,30 @@
 package com.wein3.weinapp.database;
 
-import android.app.Activity;
+import android.app.Application;
 import android.content.ContentValues;
 import android.database.Cursor;
-import android.database.sqlite.*;
+import android.database.sqlite.SQLiteDatabase;
 
 import com.wein3.weinapp.Area;
 
-import java.io.File;
 import java.util.HashMap;
 import java.util.UUID;
 
+/**
+ * Database handler to store polygons.
+ */
 public class Sqlite implements Database {
 
     private SQLiteDatabase sqLiteDatabase;
-    private static String databaseFile = "sqlite.db";
-    private static String table = "areas";
+    private final String DATABASE_FILE = "sqlite.db";
+    private final String AREA_TABLE = "area";
 
     @Override
-    public void init(Activity activity) {
-        String path = activity.getFilesDir().getParent();
-        //SQLiteDatabase.deleteDatabase(new File(path + "/" + databaseFile));
-        sqLiteDatabase = SQLiteDatabase.openOrCreateDatabase(path + "/" + databaseFile, null);
-        sqLiteDatabase.execSQL("CREATE TABLE IF NOT EXISTS " + table
+    public void init(final Application application) {
+        String path = application.getFilesDir().getParent();
+        //SQLiteDatabase.deleteDatabase(new File(path + "/" + DATABASE_FILE));
+        sqLiteDatabase = SQLiteDatabase.openOrCreateDatabase(path + "/" + DATABASE_FILE, null);
+        sqLiteDatabase.execSQL("CREATE TABLE IF NOT EXISTS " + AREA_TABLE
                 + " (id TEXT PRIMARY KEY, rev TEXT, description TEXT, gewann TEXT, size REAL,"
                 + "featureCollection TEXT, growingRegion TEXT, currentUsage TEXT, currentLandUsage TEXT,"
                 + "category TEXT, channelWidth INTEGER, wineRowsCount INTEGER,"
@@ -32,11 +34,11 @@ public class Sqlite implements Database {
     @Override
     public HashMap<String, String> getListOfAreas() {
         HashMap<String, String> listOfAreas = new HashMap<>();
-        Cursor rows = sqLiteDatabase.rawQuery("SELECT id, description FROM " + table, null);
+        Cursor rows = sqLiteDatabase.rawQuery("SELECT id, description FROM " + AREA_TABLE, null);
         if (rows.moveToFirst()) {
             do {
                 listOfAreas.put(rows.getString(0), rows.getString(1));
-            } while(rows.moveToNext());
+            } while (rows.moveToNext());
         }
         rows.close();
         return listOfAreas;
@@ -45,7 +47,7 @@ public class Sqlite implements Database {
     @Override
     public Area getAreaById(String id) {
         Area area = null;
-        Cursor row = sqLiteDatabase.rawQuery("SELECT * FROM " + table + " WHERE id = '" + id + "'", null);
+        Cursor row = sqLiteDatabase.rawQuery("SELECT * FROM " + AREA_TABLE + " WHERE id = '" + id + "'", null);
         if (row.moveToFirst()) {
             area = new Area();
             area.setId(row.getString(0) != null ? row.getString(0) : "");
@@ -91,7 +93,7 @@ public class Sqlite implements Database {
         values.put("vinesCount", area.getVinesCount());
         values.put("usefullLife", area.getUsefullLife());
         values.put("business", area.getBusiness());
-        sqLiteDatabase.insert(table, null, values);
+        sqLiteDatabase.insert(AREA_TABLE, null, values);
         return uuid;
     }
 
@@ -113,12 +115,12 @@ public class Sqlite implements Database {
         values.put("vinesCount", area.getVinesCount());
         values.put("usefullLife", area.getUsefullLife());
         values.put("business", area.getBusiness());
-        sqLiteDatabase.update(table, values, "id = " + area.getId(), null);
+        sqLiteDatabase.update(AREA_TABLE, values, "id = " + area.getId(), null);
     }
 
     @Override
     public void removeAreaById(String id) {
-        sqLiteDatabase.delete(table, "id = " + id, null);
+        sqLiteDatabase.delete(AREA_TABLE, "id = " + id, null);
     }
 
     @Override

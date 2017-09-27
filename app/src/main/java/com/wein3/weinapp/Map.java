@@ -6,7 +6,6 @@ import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
-import android.content.ComponentCallbacks2;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -164,6 +163,12 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     private NotificationManager notificationManager;
 
     /**
+     * Global instance of custom BroadcastReceiver to receive location updates
+     * from GPS tracking service.
+     */
+    private TrackingBroadcastReceiver trackingBroadcastReceiver;
+
+    /**
      * FloatingActionButton to move the camera to the current location.
      */
     private FloatingActionButton fabLocation;
@@ -195,27 +200,27 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         // reset instance state
         loadStatus();
 
+        // create intent to start GPS tracking service
         intent = new Intent(this, TrackingService.class);
 
         // create or open main database
         mainDatabase = new Sqlite();
-        mainDatabase.init(this);
+        mainDatabase.init(getApplication());
 
         // create or open helper database
         helperDatabase = new HelperDatabase();
         helperDatabase.init(getApplication());
 
-        // initialize LocationManager
+        // initialize LocationManager and NotificationManager
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
         notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-
 
         // set Toolbar
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         getSupportActionBar().setDisplayShowTitleEnabled(false);
 
-        // set FloatingActionButtons
+        // set FloatingActionButton according to current instance state
         fabPath = (FloatingActionButton) findViewById(R.id.fabPath);
         fabPath.setOnClickListener(this);
         if (pathTrackingEnabled) {
@@ -308,34 +313,19 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                 }
             }
         });
-        LocalBroadcastManager.getInstance(this).registerReceiver(trackingBroadcastReceiver, new IntentFilter(Variables.TRACKING_BROADCAST_RECEIVER));
+
+        // create and register custom BroadcastReceiver to receive
+        // location updates from GPS tracking service
+        trackingBroadcastReceiver = new TrackingBroadcastReceiver();
+        LocalBroadcastManager.getInstance(this).registerReceiver(
+                trackingBroadcastReceiver,
+                new IntentFilter(Variables.TRACKING_BROADCAST_RECEIVER)
+        );
     }
 
-
-    private BroadcastReceiver trackingBroadcastReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            // get location data included in the Intent
-            double latitude = intent.getDoubleExtra(Variables.LATITUDE, 0);
-            double longitude = intent.getDoubleExtra(Variables.LONGITUDE, 0);
-            currentPosition = new LatLng(latitude, longitude);
-            // store the location information if tracking is enabled
-            if (pathTrackingEnabled) {
-                polylineOptions.add(currentPosition);
-                helperDatabase.addToCurrentPath(latitude, longitude);
-            }
-
-            /*String[] parts = message.split(",");
-            for (int i = 0; i < parts.length - 1; i += 2) {
-                Map.this.options.add(new LatLng(Double.parseDouble(parts[i]), Double.parseDouble(parts[i + 1])));
-            }*/
-            //}
-        }
-    };
-
-
     /**
-     * Close DrawerLayout.
+     * Take care of popping the fragment back stack or finishing the activity
+     * as appropriate.
      */
     @Override
     public void onBackPressed() {
@@ -772,4 +762,31 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         // send the notification.
         notificationManager.notify(R.string.tracking_service_running, notification);
     }
+
+    /**
+     * Custom BroadcastReceiver to handle location updates from GPS tracking service.
+     */
+    private class TrackingBroadcastReceiver extends BroadcastReceiver {
+
+        /**
+         * This method is called when the BroadcastReceiver is receiving an Intent
+         * broadcast.
+         *
+         * @param context The Context in which the receiver is running.
+         * @param intent  The Intent being received.
+         */
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            // get location data included in the Intent
+            double latitude = intent.getDoubleExtra(Variables.LATITUDE, 0);
+            double longitude = intent.getDoubleExtra(Variables.LONGITUDE, 0);
+            currentPosition = new LatLng(latitude, longitude);
+            // store the location information if tracking is enabled
+            if (pathTrackingEnabled) {
+                polylineOptions.add(currentPosition);
+                helperDatabase.addToCurrentPath(latitude, longitude);
+            }
+        }
+    }
+
 }

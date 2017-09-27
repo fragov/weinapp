@@ -97,7 +97,7 @@ public class TrackingService extends Service {
     }
 
     /**
-     * Custom LocationListener.
+     * Custom LocationListener to handle data from GPS provider.
      */
     private class TrackingLocationListener implements LocationListener {
 
