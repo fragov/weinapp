@@ -10,6 +10,7 @@ import android.location.LocationManager;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.support.v4.content.LocalBroadcastManager;
+import android.util.Log;
 import android.widget.Toast;
 
 import com.wein3.weinapp.database.HelperDatabase;
@@ -17,6 +18,8 @@ import com.wein3.weinapp.database.HelperDatabase;
 public class TrackingService extends Service {
 
     private HelperDatabase helperDatabase;
+    private LocationManager locationManager;
+    private TrackingLocationListener locationListener;
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -27,8 +30,8 @@ public class TrackingService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         // enable GPS tracking
-        LocationManager locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-        TrackingLocationListener locationListener = new TrackingLocationListener();
+        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        locationListener = new TrackingLocationListener();
         int gpsPermission = getBaseContext().checkCallingOrSelfPermission("android.permission.ACCESS_FINE_LOCATION");
         int networkPermission = getBaseContext().checkCallingOrSelfPermission("android.permission.ACCESS_COARSE_LOCATION");
         if (gpsPermission == PackageManager.PERMISSION_GRANTED) {
@@ -47,6 +50,8 @@ public class TrackingService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
+        locationManager.removeUpdates(locationListener);
+        locationManager = null;
     }
 
     private void sendLocation(final double latitude, final double longitude) {

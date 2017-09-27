@@ -49,6 +49,7 @@
             android:stopWithTask="false">
         </service>
         <activity android:name=".DBContent"></activity>
+
     </application>
 
 </manifest>

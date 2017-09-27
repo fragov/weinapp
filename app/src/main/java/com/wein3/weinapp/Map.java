@@ -89,7 +89,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     /**
      * Key for NotificationManager.
      */
-    private final int KEY_NOTIFICATION_MANAGER = 1;
+    private final int KEY_NOTIFICATION_MANAGER = R.string.tracking_service_running;
 
     /**
      * Key to store path tracking flag.
@@ -175,6 +175,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
 
     private String description;
     private Area newArea;
+    private Intent intent;
 
     /**
      * Create activity and instantiate views and global variables.
@@ -193,6 +194,8 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         // reset instance state
         loadStatus();
 
+        intent = new Intent(this, TrackingService.class);
+
         // create or open main database
         mainDatabase = new Sqlite();
         mainDatabase.init(this);
@@ -205,8 +208,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
         notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
 
-        Intent intent = new Intent(this, TrackingService.class);
-        startService(intent);
 
         // set Toolbar
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
@@ -594,21 +595,21 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      * Do nothing if the current position cannot be determined.
      */
     private void startNewRoute() {
-        if (currentPosition != null) {
-            showRecordingNotification();
-            // initialize a new polyline
-            polylineOptions = new PolylineOptions();
-            // add current location as first point to the polyline
-            polylineOptions.add(currentPosition);
-            // add polyline to the map
-            updatePolyline(polylineOptions);
-            // enable further GPS tracking
-            pathTrackingEnabled = true;
-            // set another icon while recording
-            fabPath.setImageResource(R.drawable.ic_stop);
-        } else {
-            Toast.makeText(Map.this, R.string.gps_not_available, Toast.LENGTH_SHORT).show();
-        }
+        startService(intent);
+        Location loc = mapboxMap.getMyLocation();
+        showRecordingNotification();
+        // initialize a new polyline
+        polylineOptions = new PolylineOptions();
+        // add current location as first point to the polyline
+        polylineOptions.add(getLatLng(loc));
+        // add polyline to the map
+        Polyline polyline = mapboxMap.addPolyline(polylineOptions);
+        polyline.setColor(Color.RED);
+        polyline.setWidth(3);
+        // enable further GPS tracking
+        pathTrackingEnabled = true;
+        // set another icon while recording
+        fabPath.setImageResource(R.drawable.ic_stop);
     }
 
     /**
@@ -623,6 +624,8 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         notificationManager.cancel(KEY_NOTIFICATION_MANAGER);
         // cleanup of helper database
         helperDatabase.clearTable();
+        stopService(intent);
+
         // save the polyline in main database
         newArea = new Area();
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
@@ -733,7 +736,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                 startActivity(new Intent(Map.this, DBContent.class));
                 break;
             case R.id.Action3:
-                Intent intent = new Intent(this, TrackingService.class);
                 stopService(intent);
 
         }
@@ -747,6 +749,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         // The PendingIntent to launch our activity if the user selects this notification
         PendingIntent contentIntent = PendingIntent.getActivity(this, 0,
                 new Intent(this, Map.class), 0);
+
 
         // Set the info for the views that show in the notification panel.
         Notification notification = new Notification.Builder(this)
