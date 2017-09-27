@@ -37,6 +37,13 @@ import java.util.Set;
  * TODO reduce time to read data (especially with no reception) because only one GGA/sec from sensor
  *
  * TODO look at log.txt on Desktop for random, weirdly corrupted and error-causing examples...
+ *
+ * TODO handle slowdown despite Threads (maybe too many synchronized?)
+ *
+ * TODO handle crash on ending Activity while Thread is running
+ *
+ * TODO handle crash on removing USB GPS device while Thread is running
+ *
  */
 public class GPS implements GPSDataSender {
 
@@ -161,6 +168,11 @@ public class GPS implements GPSDataSender {
      * TODO this is a simple way, but I should use Android to get this information
      */
     private boolean hasPermission = false;
+
+    /**
+     * Flag shows if this Object has to die.
+     */
+    private boolean almostDead = false;
 
     //-------------APPLICATION STUFF----------------------------------------------------------------
 
@@ -386,9 +398,6 @@ public class GPS implements GPSDataSender {
     }
 
     private String getSomeData() {
-        if(device == null) {
-            return NO_DEVICE;
-        }
         bytes = new byte[BUFFLEN];
 
         //connection.bulkTransfer(endpoint, bytes, bytes.length, TIMEOUT);
@@ -398,7 +407,12 @@ public class GPS implements GPSDataSender {
         StringBuilder raw = new StringBuilder();
         //TODO make this more efficient
         for(int i=0; i<BUFFLEN; i++) {
-            char c = (char) readFromGPS();
+            char c = 0;
+            try {
+                c = (char) readFromGPS();
+            } catch (GPSException e) {
+                return NO_DEVICE;
+            }
             raw.append(c);
         }
 
@@ -413,10 +427,13 @@ public class GPS implements GPSDataSender {
     private boolean hasRead = false;
     private int recLen = 0;
 
-    public byte readFromGPS() {
+    public byte readFromGPS() throws GPSException {
         byte b = 0;
 
         if(readIndex >= readCount) {
+            if(device == null) {
+                throw new GPSException(NO_DEVICE);
+            }
             readCount = connection.bulkTransfer(endpoint, bytes, BUFFLEN, TIMEOUT);
             readIndex = 0;
         }
@@ -484,6 +501,7 @@ public class GPS implements GPSDataSender {
 
     public void closit() {
         loggah("Entered closit().", false);
+        this.stopPolling();
         if(connection != null) {
             if(hasEndpoint && connection.releaseInterface(intf)) {
                 loggah("Released interface.", false);
@@ -500,9 +518,6 @@ public class GPS implements GPSDataSender {
         isInit = false;
         hasEndpoint = false;
         hasPermission = false;
-        if(this.pollingClock != null) {
-            this.stopPolling();
-        }
     }
 
     public void onDestroy() {
@@ -518,7 +533,10 @@ public class GPS implements GPSDataSender {
             context.unregisterReceiver(permissionReceiver);
             loggah("unregistered BR 2", false);
         }
+
+        this.almostDead = true;
         closit();
+
         loggah("super.onDestroy() to be called.", false);
         //TODO don't forget super.onDestroy();
     }
@@ -696,12 +714,20 @@ public class GPS implements GPSDataSender {
                 }
             };
             */
+
             Thread pollingClockThread = new Thread(this.pollingClock);
             pollingClockThread.start();
+
+            //this.directPoller = new DirectPoller();
+            //Thread t = new Thread(this.directPoller);
+            //t.start();
+
             loggah("Polling started", true);
             return true;
         } else {
             loggah("Polling start failed.", true);
+            this.pollingClock = null;
+            this.directPoller = null;
             isPollerSet = false;
             return false;
             //TODO don't use return values. Work out repeat strategy in this class
@@ -709,12 +735,24 @@ public class GPS implements GPSDataSender {
     }
 
     @Override
-    public void stopPolling() {
+    public synchronized void stopPolling() {
         //TODO human-generated method stub
         if(this.pollingClock != null) {
             this.pollingClock.stop();
             loggah("Polling stopped.", true);
             this.pollingClock = null;
+        }
+        if(this.directPoller != null) {
+            this.directPoller.stop();
+            loggah("Polling stopped.", true);
+            this.directPoller = null;
+        }
+        if(this.almostDead && this.isPollerSet) {
+            try {
+                this.wait();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
         isPollerSet = false;
     }
@@ -738,11 +776,11 @@ public class GPS implements GPSDataSender {
                     }
                 };
                 */
-                Thread thread = new Thread(new Poller());
-                //thread.setPriority(Thread.MIN_PRIORITY);
+                Thread thread = new Thread(new Poller(this));
                 thread.start();
                 try {
-                    Thread.sleep(this.wait);
+                    //Thread.sleep(this.wait);
+                    this.t_lock();
                 } catch (InterruptedException e) {
                     Log.e(LCDT, "Couldn't wait in PollingClock.");
                     this.stop();
@@ -753,9 +791,24 @@ public class GPS implements GPSDataSender {
         public void stop () {
             this.stopFlag = true;
         }
+
+        public synchronized void t_lock() throws InterruptedException {
+            this.wait();
+        }
+
+        public synchronized void t_unlock() {
+            this.notify();
+        }
     }
 
     private class Poller implements Runnable {
+
+        private PollingClock pc;
+
+        public Poller(PollingClock pc) {
+            this.pc = pc;
+        }
+
         @Override
         public void run() {
             GPS.this.setLastKnownLatLng();
@@ -764,6 +817,36 @@ public class GPS implements GPSDataSender {
             b.putString("mess", "gotMess");
             mess.setData(b);
             pollHandler.sendMessage(mess);
+            pc.t_unlock();
+            if(GPS.this.almostDead) {
+                GPS.this.notify();
+            }
+        }
+    }
+
+    private DirectPoller directPoller;
+
+    private class DirectPoller implements Runnable {
+
+        private boolean stopFlag = false;
+
+        @Override
+        public void run() {
+            while(!stopFlag) {
+                GPS.this.setLastKnownLatLng();
+                Message mess = pollHandler.obtainMessage();
+                Bundle b = new Bundle();
+                b.putString("mess", "gotMess");
+                mess.setData(b);
+                pollHandler.sendMessage(mess);
+                if(GPS.this.almostDead) {
+                    GPS.this.notify();
+                }
+            }
+        }
+
+        public void stop() {
+            this.stopFlag = true;
         }
     }
 }
