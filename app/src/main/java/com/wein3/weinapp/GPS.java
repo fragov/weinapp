@@ -44,6 +44,8 @@ import java.util.Set;
  *
  * TODO handle crash on removing USB GPS device while Thread is running
  *
+ * TODO make GPS useable without restart...
+ *
  */
 public class GPS implements GPSDataSender {
 
@@ -260,8 +262,6 @@ public class GPS implements GPSDataSender {
 
     /**
      * This handler is used to receive Messages from the Poller Runnable.
-     *
-     * TODO use other Android-specific solutions to use something like this for multiple Poller instances
      */
     private final Handler pollHandler = new Handler() {
         @Override
@@ -308,11 +308,24 @@ public class GPS implements GPSDataSender {
         this.onCreate();
     }
 
+    //-------------READING METHODS------------------------------------------------------------------
+
+    /**
+     * This returns the last known location. If no Poller is set, this method calls setLastKnownLatLng.
+     * Please be aware that that method would be executed in the UI Thread so it is not recommended
+     * to use it directly. Instead, consider using a poller.
+     *
+     * @return - last known location in LatLng
+     */
     public LatLng getLastKnownLatLng() {
         if(!isPollerSet) setLastKnownLatLng();
         return this.lastKnownLatLng;
     }
 
+    /**
+     * This calculates the current location.
+     * Please be aware that this method needs a lot of time.
+     */
     private synchronized void setLastKnownLatLng() {
         String gga = getFirstGGAString();
         loggah("GGA String - " + gga, false);
@@ -322,6 +335,13 @@ public class GPS implements GPSDataSender {
         }
     }
 
+    /**
+     * This returns a LatLng object with the coordinates specified in the parameter, which has to be
+     * a String containing an NMEA GGA sentence.
+     *
+     * @param gga - GGA dataset
+     * @return - LatLng with location from GGA dataset
+     */
     public LatLng ggaToLatLng(String gga) {
         if(gga.equals(FAILED_RESULT)) {
             loggah("Got invalid information from sensor.", true);
@@ -377,6 +397,11 @@ public class GPS implements GPSDataSender {
         return retVal;
     }
 
+    /**
+     * Get the next GGA dataset from the USB GPS device.
+     *
+     * @return - GGA dataset
+     */
     public String getFirstGGAString() {
         String data = getSomeData();
 
@@ -397,6 +422,11 @@ public class GPS implements GPSDataSender {
         return builder.toString();
     }
 
+    /**
+     * Read BUFFLEN bytes in a buffer and turn the buffer into a String.
+     *
+     * @return - raw data as a String
+     */
     private String getSomeData() {
         bytes = new byte[BUFFLEN];
 
@@ -421,6 +451,8 @@ public class GPS implements GPSDataSender {
 
         return raw.toString();
     }
+
+    //TODO make Javadocs for read, etc.
 
     private int readIndex = 0;
     private int readCount = 0;
@@ -449,6 +481,13 @@ public class GPS implements GPSDataSender {
         return b;
     }
 
+    //-------------INITIALIZING AND CLOSING---------------------------------------------------------
+
+    /**
+     * This class was written to easily store and compare important device information.
+     *
+     * TODO make inner Javadocs
+     */
     private class DeviceInfoWrapper {
         public int vendorId;
         public int productId;
@@ -463,6 +502,9 @@ public class GPS implements GPSDataSender {
         }
     }
 
+    /**
+     * Used to get a USB device and ask for permission to access it.
+     */
     private void onCreate() {
         //TODO test all connected devices with nested loops
         Iterator<UsbDevice> iterator = manager.getDeviceList().values().iterator();
@@ -499,6 +541,9 @@ public class GPS implements GPSDataSender {
         }
     }
 
+    /**
+     * Used to close connection, remove device and reset state.
+     */
     public void closit() {
         loggah("Entered closit().", false);
         this.stopPolling();
@@ -520,6 +565,10 @@ public class GPS implements GPSDataSender {
         hasPermission = false;
     }
 
+    /**
+     * This method should be called in an Activity's onDestroy() method. It unregisters all
+     * BroadcastReceivers and should disconnect everything "safely" if the Activity is closed.
+     */
     public void onDestroy() {
         if(attachReceiver != null) {
             context.unregisterReceiver(attachReceiver);
@@ -541,6 +590,9 @@ public class GPS implements GPSDataSender {
         //TODO don't forget super.onDestroy();
     }
 
+    /**
+     * This method should establish a connection.
+     */
     private void init() {
         if(!isInit) {
             isInit = true;
@@ -735,7 +787,7 @@ public class GPS implements GPSDataSender {
     }
 
     @Override
-    public synchronized void stopPolling() {
+    public void stopPolling() {
         //TODO human-generated method stub
         if(this.pollingClock != null) {
             this.pollingClock.stop();
@@ -748,10 +800,12 @@ public class GPS implements GPSDataSender {
             this.directPoller = null;
         }
         if(this.almostDead && this.isPollerSet) {
-            try {
-                this.wait();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
+            synchronized (this) {
+                try {
+                    this.wait();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
             }
         }
         isPollerSet = false;
@@ -826,6 +880,9 @@ public class GPS implements GPSDataSender {
 
     private DirectPoller directPoller;
 
+    /**
+     * TODO : this is the more elegant way, but it doesn't really work...
+     */
     private class DirectPoller implements Runnable {
 
         private boolean stopFlag = false;
