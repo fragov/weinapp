@@ -7,6 +7,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.location.Location;
@@ -33,6 +34,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.EditText;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.mapbox.mapboxsdk.Mapbox;
@@ -84,20 +86,20 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     private final int REQUEST_CODE_LOCATION_SOURCE_SETTINGS = 0;
 
     /**
-     * Key to store the path tracking flag.
+     * Key to store path tracking flag.
      */
-    private final String KEY_INSTANCE_STATE_PATH_TRACKING_ENABLED = "path_tracking_enabled";
+    private final String KEY_PATH_TRACKING_ENABLED = "path_tracking_enabled";
 
     /**
-     * Key to store the path tracking flag.
+     * Key to store zoom factor.
      */
-    private final String KEY_INSTANCE_STATE_TRACKING_SERVICE_STARTED = "tracking_service_started";
+    private final String KEY_ZOOM_FACTOR = "zoom_factor";
 
     /**
-     * Key to store the zoom factor.
+     * Key for the Map activity's SharedPreferences.
      */
-    private final String KEY_INSTANCE_STATE_ZOOM_FACTOR = "zoom_factor";
-
+    private final String KEY_SHARED_PREFERENCES_MAP = "map_shared_preferences";
+    
     /**
      * Boolean flag indicating whether or not GPS tracking of one's current path is enabled.
      */
@@ -177,18 +179,8 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         Mapbox.getInstance(this, getString(R.string.access_token));
         setContentView(R.layout.activity_map);
 
-        // reset instance state from Bundle
-        if (savedInstanceState != null) {
-            // restore attribute values from saved state
-            pathTrackingEnabled = savedInstanceState.getBoolean(KEY_INSTANCE_STATE_PATH_TRACKING_ENABLED);
-            trackingServiceStarted = savedInstanceState.getBoolean(KEY_INSTANCE_STATE_TRACKING_SERVICE_STARTED);
-            zoomFactor = savedInstanceState.getDouble(KEY_INSTANCE_STATE_ZOOM_FACTOR);
-        } else {
-            // initialize attributes with default values
-            pathTrackingEnabled = false;
-            trackingServiceStarted = false;
-            zoomFactor = -1;
-        }
+        // reset instance state
+        loadStatus();
 
         // create or open main database
         mainDatabase = new Sqlite();
@@ -407,8 +399,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         if (pathTrackingEnabled) {
             helperDatabase.updateCurrentPath(polylineOptions);
         }
-        StatusVariables statusVariables = new StatusVariables(pathTrackingEnabled, mapboxMap.getCameraPosition().zoom);
-        helperDatabase.updateStatus(statusVariables);
     }
 
     /**
@@ -422,6 +412,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
             mainDatabase.close();
             helperDatabase.close();
         }
+        saveStatus();
     }
 
     /**
@@ -440,9 +431,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      */
     @Override
     public void onSaveInstanceState(Bundle savedInstanceState) {
-        savedInstanceState.putBoolean(KEY_INSTANCE_STATE_PATH_TRACKING_ENABLED, pathTrackingEnabled);
-        savedInstanceState.putBoolean(KEY_INSTANCE_STATE_TRACKING_SERVICE_STARTED, trackingServiceStarted);
-        savedInstanceState.putDouble(KEY_INSTANCE_STATE_ZOOM_FACTOR, mapboxMap.getCameraPosition().zoom);
         super.onSaveInstanceState(savedInstanceState);
         mapView.onSaveInstanceState(savedInstanceState);
     }
@@ -551,6 +539,26 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     private void moveCamera(final Location location, final int animationLength) {
         LatLng currentPosition = getLatLng(location);
         moveCamera(currentPosition, animationLength);
+    }
+
+    /**
+     * Save current status variables to SharedPreferences.
+     */
+    private void saveStatus() {
+        SharedPreferences data = getSharedPreferences(KEY_SHARED_PREFERENCES_MAP, Context.MODE_PRIVATE);
+        SharedPreferences.Editor edit = data.edit();
+        edit.putBoolean(KEY_PATH_TRACKING_ENABLED, pathTrackingEnabled);
+        edit.putFloat(KEY_ZOOM_FACTOR, (float) mapboxMap.getCameraPosition().zoom);
+        edit.commit();
+    }
+
+    /**
+     * Load current status variables from SharedPreferences.
+     */
+    private void loadStatus() {
+        SharedPreferences data = getSharedPreferences(KEY_SHARED_PREFERENCES_MAP, Context.MODE_PRIVATE);
+        pathTrackingEnabled = data.getBoolean(KEY_PATH_TRACKING_ENABLED, false);
+        zoomFactor = data.getFloat(KEY_ZOOM_FACTOR, -1);
     }
 
     /**
