@@ -3,6 +3,7 @@ package com.wein3.weinapp;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
@@ -11,14 +12,11 @@ import android.os.IBinder;
 import android.support.v4.content.LocalBroadcastManager;
 import android.widget.Toast;
 
-
-import static java.lang.Math.round;
+import com.wein3.weinapp.database.HelperDatabase;
 
 public class TrackingService extends Service {
 
-    private LocationManager locationManager;
-    private MyLocationListener listener;
-
+    private HelperDatabase helperDatabase;
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -28,13 +26,22 @@ public class TrackingService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-        listener = new MyLocationListener();
-
-        locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 4000, 0, listener);
-        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 4000, 0, listener);
+        // enable GPS tracking
+        LocationManager locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        TrackingLocationListener locationListener = new TrackingLocationListener();
+        int gpsPermission = getBaseContext().checkCallingOrSelfPermission("android.permission.ACCESS_FINE_LOCATION");
+        int networkPermission = getBaseContext().checkCallingOrSelfPermission("android.permission.ACCESS_COARSE_LOCATION");
+        if (gpsPermission == PackageManager.PERMISSION_GRANTED) {
+            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 2000, 0, locationListener);
+        } else if (networkPermission == PackageManager.PERMISSION_GRANTED) {
+            locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 2000, 0, locationListener);
+        } else {
+            locationManager.requestLocationUpdates(LocationManager.PASSIVE_PROVIDER, 2000, 0, locationListener);
+        }
+        // initialize helper database
+        helperDatabase = new HelperDatabase();
+        helperDatabase.init(getApplication());
         return START_STICKY;
-
     }
 
     @Override
@@ -42,31 +49,25 @@ public class TrackingService extends Service {
         super.onDestroy();
     }
 
-    private void sendMessageToActivity(String message) {
-        Intent intent = new Intent("GPSLocationUpdates");
-        intent.putExtra("coords", message);
-        LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
-
+    private void sendLocation(final double latitude, final double longitude) {
+        Intent intent = new Intent(Variables.TRACKING_BROADCAST_RECEIVER);
+        intent.putExtra(Variables.LATITUDE, latitude);
+        intent.putExtra(Variables.LONGITUDE, longitude);
+        boolean resultCode = LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
+        // check if broadcast was successful and save the coordinates in the database if not
+        if (!resultCode) {
+            helperDatabase.addToCurrentPath(latitude, longitude);
+        }
     }
 
-    private void sendCoords(Double x, Double y){
-        Intent intent = new Intent("GPSLocationUpdates");
-        intent.putExtra("Latitude", x);
-        intent.putExtra("Longitude", y);
-        LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
-    }
-
-
-    public class MyLocationListener implements LocationListener {
+    private class TrackingLocationListener implements LocationListener {
 
         public void onLocationChanged(Location location) {
-            if (location == null) {
-                Toast.makeText(TrackingService.this, "Komme nicht an GPS Daten ran", Toast.LENGTH_LONG).show();
+            if (location != null) {
+                sendLocation(location.getLatitude(), location.getLongitude());
             } else {
-                sendCoords(location.getLatitude(), location.getLongitude());
+                Toast.makeText(TrackingService.this, R.string.gps_not_available, Toast.LENGTH_SHORT).show();
             }
-
-
         }
 
         public void onProviderDisabled(String provider) {
@@ -78,10 +79,9 @@ public class TrackingService extends Service {
 
         }
 
-
         public void onStatusChanged(String provider, int status, Bundle extras) {
 
         }
-
     }
+
 }

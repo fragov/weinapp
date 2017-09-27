@@ -45,8 +45,8 @@
         <service
             android:name=".TrackingService"
             android:enabled="true"
-
-            android:exported="true" >
+            android:exported="false"
+            android:stopWithTask="false">
         </service>
         <activity android:name=".DBContent"></activity>
     </application>

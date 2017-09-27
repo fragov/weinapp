@@ -1,6 +1,7 @@
 package com.wein3.weinapp.database;
 
 import android.app.Activity;
+import android.app.Application;
 import android.content.ContentValues;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
@@ -24,29 +25,25 @@ public class HelperDatabase {
      * Open or create helper database.
      * Create a table with two rows, one for latitude and the other for longitude.
      *
-     * @param activity current Activity instance
+     * @param application current Application instance
      */
-    public void init(final Activity activity) {
-        String path = activity.getFilesDir().getParent();
+    public void init(final Application application) {
+        String path = application.getFilesDir().getParent();
         sqLiteDatabase = SQLiteDatabase.openOrCreateDatabase(path + "/" + DATABASE_FILE, null);
         sqLiteDatabase.execSQL("CREATE TABLE IF NOT EXISTS " + CURRENT_PATH_TABLE + "(latitude REAL NOT NULL, longitude REAL NOT NULL);");
     }
 
     /**
-     * Replace the recently saved path with the specified one.
+     * Add a single coordinate to current path.
      *
-     * @param options PolylineOptions instance which should be stored
+     * @param latitude double value representing the latitude
+     * @param longitude double value representing the longitude
      */
-    public void updateCurrentPath(final PolylineOptions options) {
-        if (options != null) {
-            deleteTable();
-            for (LatLng position : options.getPoints()) {
-                ContentValues values = new ContentValues();
-                values.put("latitude", position.getLatitude());
-                values.put("longitude", position.getLongitude());
-                sqLiteDatabase.insert(CURRENT_PATH_TABLE, null, values);
-            }
-        }
+    public void addToCurrentPath(final double latitude, final double longitude) {
+        ContentValues values = new ContentValues();
+        values.put("latitude", latitude);
+        values.put("longitude", longitude);
+        sqLiteDatabase.insert(CURRENT_PATH_TABLE, null, values);
     }
 
     /**
@@ -72,7 +69,7 @@ public class HelperDatabase {
     /**
      * Delete the recently saved path.
      */
-    public void deleteTable() {
+    public void clearTable() {
         sqLiteDatabase.execSQL("DELETE FROM " + CURRENT_PATH_TABLE);
     }
 

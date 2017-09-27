@@ -14,12 +14,10 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.location.Location;
-import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.NavigationView;
 import android.support.v4.app.ActivityCompat;
@@ -38,7 +36,6 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.EditText;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import com.mapbox.mapboxsdk.Mapbox;
@@ -90,6 +87,11 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     private final int REQUEST_CODE_LOCATION_SOURCE_SETTINGS = 0;
 
     /**
+     * Key for NotificationManager.
+     */
+    private final int KEY_NOTIFICATION_MANAGER = 1;
+
+    /**
      * Key to store path tracking flag.
      */
     private final String KEY_PATH_TRACKING_ENABLED = "path_tracking_enabled";
@@ -100,19 +102,14 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     private final String KEY_ZOOM_FACTOR = "zoom_factor";
 
     /**
-     * Key for the Map activity's SharedPreferences.
+     * Key for Map activity's SharedPreferences.
      */
-    private final String KEY_SHARED_PREFERENCES_MAP = "map_shared_preferences";
+    private final String KEY_SHARED_PREFERENCES_MAP = "shared_preferences_map";
 
     /**
      * Boolean flag indicating whether or not GPS tracking of one's current path is enabled.
      */
     private boolean pathTrackingEnabled;
-
-    /**
-     * Boolean flag indicating whether or not GPS tracking service is started.
-     */
-    private boolean trackingServiceStarted;
 
     /**
      * Zoom factor of camera.
@@ -151,9 +148,19 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     private Polyline currentPolyline;
 
     /**
-     * Get LocationManager to manage the built-in GPS provider.
+     * LatLng instance containing the latest position from the TrackingService.
+     */
+    private LatLng currentPosition;
+
+    /**
+     * Global LocationManager instance.
      */
     private LocationManager locationManager;
+
+    /**
+     * Global NotificationManager instance.
+     */
+    private NotificationManager notificationManager;
 
     /**
      * FloatingActionButton to move the camera to the current location.
@@ -168,9 +175,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
 
     private String description;
     private Area newArea;
-    private LatLng currentLatLng;
-    private NotificationManager nManager;
-    private int NOTIFICATION = R.string.local_service_started;
 
     /**
      * Create activity and instantiate views and global variables.
@@ -195,11 +199,11 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
 
         // create or open helper database
         helperDatabase = new HelperDatabase();
-        helperDatabase.init(this);
+        helperDatabase.init(getApplication());
 
         // initialize LocationManager
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-        nManager = (NotificationManager)getSystemService(NOTIFICATION_SERVICE);
+        notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
 
         Intent intent = new Intent(this, TrackingService.class);
         startService(intent);
@@ -274,10 +278,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                 );
                 // enable plotting of current (or last known) location
                 mapboxMap.setMyLocationEnabled(true);
-                // set listener for future location changes
-                //mapboxMap.setOnMyLocationChangeListener(Map.this);
                 // set camera view to its default position
-                mapboxMap.setCameraPosition(CameraPosition.DEFAULT);
                 if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
                     // GPS is enabled, therefore directly move camera to current location
                     Location location = mapboxMap.getMyLocation();
@@ -305,21 +306,21 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                 }
             }
         });
-        LocalBroadcastManager.getInstance(this).registerReceiver(mMessageReceiver,
-                new IntentFilter("GPSLocationUpdates"));
+        LocalBroadcastManager.getInstance(this).registerReceiver(trackingBroadcastReceiver, new IntentFilter(Variables.TRACKING_BROADCAST_RECEIVER));
     }
 
 
-    private BroadcastReceiver mMessageReceiver = new BroadcastReceiver() {
+    private BroadcastReceiver trackingBroadcastReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            // Get extra data included in the Intent
-            double x = intent.getDoubleExtra("Latitude", 0);
-            double y = intent.getDoubleExtra("Longitude", 0);
-
-            currentLatLng = new LatLng(x, y);
-            if(pathTrackingEnabled) {
-                polylineOptions.add(currentLatLng);
+            // get location data included in the Intent
+            double latitude = intent.getDoubleExtra(Variables.LATITUDE, 0);
+            double longitude = intent.getDoubleExtra(Variables.LONGITUDE, 0);
+            currentPosition = new LatLng(latitude, longitude);
+            // store the location information if tracking is enabled
+            if (pathTrackingEnabled) {
+                polylineOptions.add(currentPosition);
+                helperDatabase.addToCurrentPath(latitude, longitude);
             }
 
             /*String[] parts = message.split(",");
@@ -372,7 +373,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     }
 
     /**
-     * Start activity and get recently saved path from database.
+     * Start activity.
      */
     @Override
     public void onStart() {
@@ -381,7 +382,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     }
 
     /**
-     * Make activity accessible and stop GPS tracking service.
+     * Make activity accessible.
      */
     @Override
     public void onResume() {
@@ -390,8 +391,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     }
 
     /**
-     * Push activity to the background and start GPS tracking
-     * service in the case the current path should be tracked.
+     * Push activity to the background.
      */
     @Override
     public void onPause() {
@@ -400,19 +400,17 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     }
 
     /**
-     * Stop activity and save current path in database in the case it should be tracked.
+     * Stop activity.
      */
     @Override
     protected void onStop() {
         super.onStop();
         mapView.onStop();
-        if (pathTrackingEnabled) {
-            helperDatabase.updateCurrentPath(polylineOptions);
-        }
     }
 
     /**
-     * Destroy activity and close database.
+     * Destroy activity but store current path and status variables
+     * if GPS tracking is still enabled.
      */
     @Override
     protected void onDestroy() {
@@ -596,18 +594,14 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      * Do nothing if the current position cannot be determined.
      */
     private void startNewRoute() {
-        if (currentLatLng != null) {
+        if (currentPosition != null) {
             showRecordingNotification();
-            Log.d("X wert: ", currentLatLng.getLatitude() + " ");
-            Log.d("Y wert: ", currentLatLng.getLongitude() + " ");
             // initialize a new polyline
             polylineOptions = new PolylineOptions();
             // add current location as first point to the polyline
-            polylineOptions.add(currentLatLng);
+            polylineOptions.add(currentPosition);
             // add polyline to the map
-            Polyline polyline = mapboxMap.addPolyline(polylineOptions);
-            polyline.setColor(Color.RED);
-            polyline.setWidth(3);
+            updatePolyline(polylineOptions);
             // enable further GPS tracking
             pathTrackingEnabled = true;
             // set another icon while recording
@@ -623,18 +617,19 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     private void stopCurrentRoute() {
         // disable further GPS tracking
         pathTrackingEnabled = false;
-        // reset the original icon
+        // reset the original button icon
         fabPath.setImageResource(R.drawable.ic_record);
-        nManager.cancel(NOTIFICATION);
-
+        // cancel notification
+        notificationManager.cancel(KEY_NOTIFICATION_MANAGER);
+        // cleanup of helper database
+        helperDatabase.clearTable();
+        // save the polyline in main database
         newArea = new Area();
-
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle(R.string.save_polygon_dialog_enter_description);
         final EditText input = new EditText(this);
         input.setInputType(InputType.TYPE_CLASS_TEXT);
         builder.setView(input);
-
         builder.setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
@@ -657,7 +652,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                 mapboxMap.removePolyline(polylineOptions.getPolyline());
             }
         });
-
         builder.setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
@@ -665,7 +659,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                 mapboxMap.removePolyline(polylineOptions.getPolyline());
             }
         });
-
         builder.show();
     }
 
@@ -697,7 +690,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     public void onClick(View v) {
         switch (v.getId()) {
             case R.id.fabPath:
-                trackingServiceStarted = true;
                 if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
                     if (pathTrackingEnabled) {
                         stopCurrentRoute();
@@ -759,14 +751,14 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         // Set the info for the views that show in the notification panel.
         Notification notification = new Notification.Builder(this)
                 .setSmallIcon(R.drawable.ic_record)// the status icon
-                .setTicker(getText(R.string.local_service_started))  // the status text
+                .setTicker(getText(R.string.tracking_service_running))  // the status text
                 .setWhen(System.currentTimeMillis())  // the time stamp
-                .setContentTitle(getText(R.string.local_service_started))  // the label of the entry
+                .setContentTitle(getText(R.string.tracking_service_running))  // the label of the entry
                 .setContentIntent(contentIntent)  // The intent to send when the entry is clicked
                 .setOngoing(true)  //makes the swipe of notification impossible
                 .build();
 
         // Send the notification.
-        nManager.notify(NOTIFICATION, notification);
+        notificationManager.notify(R.string.tracking_service_running, notification);
     }
 }
