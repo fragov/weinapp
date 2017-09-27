@@ -1,19 +1,18 @@
 package com.wein3.weinapp.database;
 
-import android.app.Activity;
 import android.app.Application;
 import android.content.ContentValues;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 
-import com.mapbox.mapboxsdk.annotations.PolylineOptions;
 import com.mapbox.mapboxsdk.geometry.LatLng;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Database handler to store the current path in case of accidental destruction of the app.
+ * Database handler to store the current path so that it can
+ * be re-established in case of accidental destruction of the app.
  */
 public class HelperDatabase {
 
@@ -25,7 +24,7 @@ public class HelperDatabase {
      * Open or create helper database.
      * Create a table with two rows, one for latitude and the other for longitude.
      *
-     * @param application current Application instance
+     * @param application current Application instance.
      */
     public void init(final Application application) {
         String path = application.getFilesDir().getParent();
@@ -36,8 +35,8 @@ public class HelperDatabase {
     /**
      * Add a single coordinate to current path.
      *
-     * @param latitude double value representing the latitude
-     * @param longitude double value representing the longitude
+     * @param latitude  double value representing the latitude.
+     * @param longitude double value representing the longitude.
      */
     public void addToCurrentPath(final double latitude, final double longitude) {
         ContentValues values = new ContentValues();
@@ -49,7 +48,7 @@ public class HelperDatabase {
     /**
      * Get the recently saved path.
      *
-     * @return List of LatLng instances representing the path
+     * @return List of LatLng instances representing the path.
      */
     public List<LatLng> getCurrentPath() {
         List<LatLng> coordinates = new ArrayList<>();

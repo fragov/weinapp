@@ -6,6 +6,7 @@ import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
+import android.content.ComponentCallbacks2;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -347,10 +348,11 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     }
 
     /**
-     * Inflate the menu and add items to the action bar if it is present.
+     * Initialize the contents of the Activity's standard options menu.
      *
-     * @param menu Menu instance which should be shown
-     * @return boolean indicating if menu is visible
+     * @param menu The options menu in which you place your items.
+     * @return You must return true for the menu to be displayed;
+     * if you return false it will not be shown.
      */
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -359,10 +361,11 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     }
 
     /**
-     * Handle action bar item clicks.
+     * This hook is called whenever an item in your options menu is selected.
      *
-     * @param item selected item
-     * @return true if item is selected
+     * @param item The menu item that was selected.
+     * @return boolean Return false to allow normal menu processing to
+     * proceed, true to consume it here.
      */
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
@@ -410,8 +413,8 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     }
 
     /**
-     * Destroy activity but store current path and status variables
-     * if GPS tracking is still enabled.
+     * Destroy activity and store status variables. Only
+     * close databases if GPS tracking is still enabled.
      */
     @Override
     protected void onDestroy() {
@@ -425,7 +428,8 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     }
 
     /**
-     * onLowMemory() --> mapView
+     * This is called when the overall system is running low on memory, and
+     * actively running processes should trim their memory usage.
      */
     @Override
     public void onLowMemory() {
@@ -434,9 +438,11 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     }
 
     /**
-     * Save the current state of the activity.
+     * Called to retrieve per-instance state from an activity before being killed
+     * so that the state can be restored in onCreate() or
+     * onRestoreInstanceState().
      *
-     * @param savedInstanceState Bundle containing all status variables
+     * @param savedInstanceState Bundle in which to place your saved state.
      */
     @Override
     public void onSaveInstanceState(Bundle savedInstanceState) {
@@ -603,9 +609,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         // add current location as first point to the polyline
         polylineOptions.add(getLatLng(loc));
         // add polyline to the map
-        Polyline polyline = mapboxMap.addPolyline(polylineOptions);
-        polyline.setColor(Color.RED);
-        polyline.setWidth(3);
+        updatePolyline(polylineOptions);
         // enable further GPS tracking
         pathTrackingEnabled = true;
         // set another icon while recording
@@ -666,11 +670,16 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     }
 
     /**
-     * Reveive results from a recently started activity.
+     * Called when an activity you launched exits, giving you the requestCode
+     * you started it with, the resultCode it returned, and any additional
+     * data from it.
      *
-     * @param requestCode request code to startActivityResult() to identify from whom comes the result
-     * @param resultCode  result code provided by the child Activity which is returned by its setResult() method
-     * @param data        an intent which can return result data
+     * @param requestCode The integer request code originally supplied to
+     *                    startActivityForResult(), allowing you to identify who this
+     *                    result came from.
+     * @param resultCode  The integer result code returned by the child activity
+     *                    through its setResult().
+     * @param data        An Intent, which can return result data to the caller.
      */
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
@@ -739,29 +748,28 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                 stopService(intent);
 
         }
-
         DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
         drawer.closeDrawer(GravityCompat.START);
         return true;
     }
 
+    /**
+     * Show notification while GPS tracking is running.
+     */
     private void showRecordingNotification() {
-        // The PendingIntent to launch our activity if the user selects this notification
+        // PendingIntent to launch our activity if the user selects this notification
         PendingIntent contentIntent = PendingIntent.getActivity(this, 0,
                 new Intent(this, Map.class), 0);
-
-
-        // Set the info for the views that show in the notification panel.
+        // set the info for the views that show in the notification panel.
         Notification notification = new Notification.Builder(this)
-                .setSmallIcon(R.drawable.ic_record)// the status icon
-                .setTicker(getText(R.string.tracking_service_running))  // the status text
-                .setWhen(System.currentTimeMillis())  // the time stamp
-                .setContentTitle(getText(R.string.tracking_service_running))  // the label of the entry
-                .setContentIntent(contentIntent)  // The intent to send when the entry is clicked
-                .setOngoing(true)  //makes the swipe of notification impossible
+                .setSmallIcon(R.drawable.ic_record) // the status icon
+                .setTicker(getText(R.string.tracking_service_running)) // the status text
+                .setWhen(System.currentTimeMillis()) // the time stamp
+                .setContentTitle(getText(R.string.tracking_service_running)) // the label of the entry
+                .setContentIntent(contentIntent) // the intent to send when the entry is clicked
+                .setOngoing(true) // makes the swipe of notification impossible
                 .build();
-
-        // Send the notification.
+        // send the notification.
         notificationManager.notify(R.string.tracking_service_running, notification);
     }
 }

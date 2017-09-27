@@ -21,9 +21,9 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme.NoActionBar">
-        <activity android:name=".Map"
-            android:launchMode="singleInstance"
-            >
+        <activity
+            android:name=".Map"
+            android:launchMode="singleInstance">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -46,8 +46,7 @@
             android:name=".TrackingService"
             android:enabled="true"
             android:exported="false"
-            android:stopWithTask="false">
-        </service>
+            android:stopWithTask="false"></service>
         <activity android:name=".DBContent"></activity>
 
     </application>
