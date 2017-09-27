@@ -89,9 +89,9 @@ public class GPSTester extends AppCompatActivity implements GPSDataReceiver {
             satTime.setText(Double.toString(location.getAltitude()));
         } else {
             //loggah("No GPS.", true);
-            textViewLat.setText("FAILz");
-            textViewLong.setText("FAILz");
-            satTime.setText("FAILz");
+            textViewLat.setText("FAIL");
+            textViewLong.setText("FAIL");
+            satTime.setText("FAIL");
         }
     }
 }
