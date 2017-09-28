@@ -76,8 +76,9 @@ public class GPSTester extends AppCompatActivity implements GPSDataReceiver {
     @Override
     public void onUSBGPSLocationChanged(LatLng location) {
         if(location != null) {
-            textViewLat.setText(Double.toString(location.getLatitude()));
-            textViewLong.setText(Double.toString(location.getLongitude()));
+            LatLng loc = gps.debugLastParsedLatLng;
+            textViewLat.setText(Double.toString(loc.getLatitude()));
+            textViewLong.setText(Double.toString(loc.getLongitude()));
             satTime.setText(Double.toString(location.getAltitude()));
         } else {
             //loggah("No GPS.", true);
