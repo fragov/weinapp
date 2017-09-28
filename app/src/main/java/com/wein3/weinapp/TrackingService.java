@@ -12,6 +12,7 @@ import android.os.IBinder;
 import android.support.v4.content.LocalBroadcastManager;
 import android.widget.Toast;
 
+import com.mapbox.mapboxsdk.geometry.LatLng;
 import com.wein3.weinapp.database.HelperDatabase;
 
 /**
@@ -23,6 +24,8 @@ public class TrackingService extends Service {
     private HelperDatabase helperDatabase;
     private LocationManager locationManager;
     private TrackingLocationListener locationListener;
+    private GPS gps;
+    private boolean useExternalGpsDevice;
 
     /**
      * Return the communication channel to the service.
@@ -51,17 +54,26 @@ public class TrackingService extends Service {
      */
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        // enable GPS tracking
-        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-        locationListener = new TrackingLocationListener();
-        int gpsPermission = getBaseContext().checkCallingOrSelfPermission("android.permission.ACCESS_FINE_LOCATION");
-        int networkPermission = getBaseContext().checkCallingOrSelfPermission("android.permission.ACCESS_COARSE_LOCATION");
-        if (gpsPermission == PackageManager.PERMISSION_GRANTED) {
-            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 2000, 0, locationListener);
-        } else if (networkPermission == PackageManager.PERMISSION_GRANTED) {
-            locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 2000, 0, locationListener);
+        useExternalGpsDevice = intent.getExtras().getBoolean(Variables.KEY_USE_EXTERNAL_GPS_DEVICE, false);
+        if (useExternalGpsDevice) {
+            // enable GPS tracking from external GPS provider
+            TrackingGpsDataReceiver trackingGpsDataReceiver = new TrackingGpsDataReceiver();
+            gps = GPS.getInstance(getApplicationContext());
+            gps.registerReceiver(trackingGpsDataReceiver);
+            gps.startPolling();
         } else {
-            locationManager.requestLocationUpdates(LocationManager.PASSIVE_PROVIDER, 2000, 0, locationListener);
+            // enable GPS tracking from built-in GPS provider
+            locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+            locationListener = new TrackingLocationListener();
+            int gpsPermission = getBaseContext().checkCallingOrSelfPermission("android.permission.ACCESS_FINE_LOCATION");
+            int networkPermission = getBaseContext().checkCallingOrSelfPermission("android.permission.ACCESS_COARSE_LOCATION");
+            if (gpsPermission == PackageManager.PERMISSION_GRANTED) {
+                locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 2000, 0, locationListener);
+            } else if (networkPermission == PackageManager.PERMISSION_GRANTED) {
+                locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 2000, 0, locationListener);
+            } else {
+                locationManager.requestLocationUpdates(LocationManager.PASSIVE_PROVIDER, 2000, 0, locationListener);
+            }
         }
         // initialize helper database
         helperDatabase = new HelperDatabase();
@@ -74,13 +86,19 @@ public class TrackingService extends Service {
      */
     @Override
     public void onDestroy() {
+        if (useExternalGpsDevice) {
+            // destroy LocationManager for external GPS provider
+        } else {
+            // destroy LocationManager for built-in GPS provider
+            locationManager.removeUpdates(locationListener);
+            locationManager = null;
+        }
         super.onDestroy();
-        locationManager.removeUpdates(locationListener);
-        locationManager = null;
     }
 
     /**
-     * Send current location via broadcast to other activities.
+     * Send current location via broadcast to other activities or
+     * save it to the database if broadcasting is not possible.
      *
      * @param latitude latitude of the current location as double value.
      * @param longitude longitude of the current location as double value.
@@ -97,7 +115,7 @@ public class TrackingService extends Service {
     }
 
     /**
-     * Custom LocationListener to handle data from GPS provider.
+     * Custom LocationListener to handle location data from built-in GPS provider.
      */
     private class TrackingLocationListener implements LocationListener {
 
@@ -155,6 +173,26 @@ public class TrackingService extends Service {
         @Override
         public void onProviderDisabled(String provider) {
 
+        }
+    }
+
+    /**
+     * Custom LocationListener to handle location data from external GPS provider.
+     */
+    private class TrackingGpsDataReceiver implements GPSDataReceiver {
+
+        /**
+         * This method is called from GPSDataSender if location has changed.
+         *
+         * @param location new location as LatLng instance.
+         */
+        @Override
+        public void onUSBGPSLocationChanged(LatLng location) {
+            if (location!= null) {
+                sendLocation(location.getLatitude(), location.getLongitude());
+            } else {
+                Toast.makeText(TrackingService.this, R.string.gps_not_available, Toast.LENGTH_SHORT).show();
+            }
         }
     }
 

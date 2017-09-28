@@ -112,6 +112,11 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     private boolean pathTrackingEnabled;
 
     /**
+     * Boolean flag indicating whether or not an external GPS provider should be used.
+     */
+    private boolean useExternalGpsDevice = false;
+
+    /**
      * Zoom factor of camera.
      * Negative values indicate that the zoom factor is not set.
      */
@@ -178,10 +183,14 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      */
     private FloatingActionButton fabPath;
 
+    /**
+     * Intent to start GPS tracking service.
+     */
+    private Intent trackingServiceIntent;
+
 
     private String description;
     private Area newArea;
-    private Intent intent;
 
     /**
      * Create activity and instantiate views and global variables.
@@ -199,9 +208,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
 
         // reset instance state
         loadStatus();
-
-        // create intent to start GPS tracking service
-        intent = new Intent(this, TrackingService.class);
 
         // create or open main database
         mainDatabase = new Sqlite();
@@ -403,8 +409,13 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     }
 
     /**
-     * Destroy activity and store status variables. Only
-     * close databases if GPS tracking is still enabled.
+     * Manage destruction of the activity. The MapboxMap instance consumes
+     * a lot of ressources, therefore it may be that the Map activity is
+     * destroyed and recreated when changing from portrait to landscape
+     * mode or when switching activities within the app. In this case,
+     * some status variables have to be saved as SharedPreferences to
+     * be able to restore the instance state on recreation. Correspondingly,
+     * the database connection have to be kept open when GPS tracking is still enabled.
      */
     @Override
     protected void onDestroy() {
@@ -591,35 +602,41 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      * Do nothing if the current position cannot be determined.
      */
     private void startNewRoute() {
-        startService(intent);
-        Location loc = mapboxMap.getMyLocation();
+        // start GPS tracking service
+        trackingServiceIntent = new Intent(this, TrackingService.class);
+        trackingServiceIntent.putExtra(Variables.KEY_USE_EXTERNAL_GPS_DEVICE, useExternalGpsDevice);
+        startService(trackingServiceIntent);
+        // show corresponding notification
         showRecordingNotification();
+        // check if the BroadcastReceiver already received a location update
+        if (currentPosition == null) {
+            // no current position available, therefore
+            // get initial location from Mapbox
+            Location location = mapboxMap.getMyLocation();
+            currentPosition = getLatLng(location);
+        }
         // initialize a new polyline
         polylineOptions = new PolylineOptions();
         // add current location as first point to the polyline
-        polylineOptions.add(getLatLng(loc));
+        polylineOptions.add(currentPosition);
         // add polyline to the map
         updatePolyline(polylineOptions);
-        // enable further GPS tracking
-        pathTrackingEnabled = true;
         // set another icon while recording
         fabPath.setImageResource(R.drawable.ic_stop);
+        // set flag indicating that further GPS tracking is enabled
+        pathTrackingEnabled = true;
     }
 
     /**
      * Stop tracking of the GPS coordinates.
      */
     private void stopCurrentRoute() {
-        // disable further GPS tracking
-        pathTrackingEnabled = false;
-        // reset the original button icon
-        fabPath.setImageResource(R.drawable.ic_record);
+        // stop GPS tracking service
+        stopService(trackingServiceIntent);
         // cancel notification
         notificationManager.cancel(KEY_NOTIFICATION_MANAGER);
         // cleanup of helper database
         helperDatabase.clearTable();
-        stopService(intent);
-
         // save the polyline in main database
         newArea = new Area();
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
@@ -657,6 +674,10 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
             }
         });
         builder.show();
+        // reset the original button icon
+        fabPath.setImageResource(R.drawable.ic_record);
+        // set flag indicating that further GPS tracking is disabled
+        pathTrackingEnabled = false;
     }
 
     /**
@@ -692,7 +713,13 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     public void onClick(View v) {
         switch (v.getId()) {
             case R.id.fabPath:
-                if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                if (useExternalGpsDevice) {
+                    if (pathTrackingEnabled) {
+                        stopCurrentRoute();
+                    } else {
+                        startNewRoute();
+                    }
+                } else if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
                     if (pathTrackingEnabled) {
                         stopCurrentRoute();
                     } else {
@@ -734,9 +761,8 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
             case R.id.Action2:
                 startActivity(new Intent(Map.this, DBContent.class));
                 break;
-            case R.id.Action3:
-                stopService(intent);
-
+            default:
+                break;
         }
         DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
         drawer.closeDrawer(GravityCompat.START);
