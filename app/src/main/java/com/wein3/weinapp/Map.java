@@ -637,7 +637,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         trackingServiceIntent = new Intent(this, TrackingService.class);
         trackingServiceIntent.putExtra(Variables.KEY_USE_EXTERNAL_GPS_DEVICE, useExternalGpsDevice);
         startService(trackingServiceIntent);
-        // show corresponding notification
+        // show corresponding notificationf
         showRecordingNotification();
         // set another icon while recording
         fabPath.setImageResource(R.drawable.ic_stop);
