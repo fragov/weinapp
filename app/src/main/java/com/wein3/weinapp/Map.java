@@ -117,10 +117,10 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     private boolean useExternalGpsDevice = false;
 
     /**
-     * Zoom factor of camera.
+     * Current zoom factor of camera.
      * Negative values indicate that the zoom factor is not set.
      */
-    private double zoomFactor;
+    private double currentZoom;
 
     /**
      * Database handler to store polygons.
@@ -278,6 +278,8 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
             public void onMapReady(MapboxMap mbMap) {
                 // get Mapbox map instance
                 mapboxMap = mbMap;
+                // add listener for end of camera movement
+                mapboxMap.setOnCameraIdleListener(Map.this);
                 // add the recently saved polyline from the database
                 polylineOptions = new PolylineOptions();
                 List<LatLng> coordinates = helperDatabase.getCurrentPath();
@@ -304,8 +306,8 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                 if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
                     // GPS is enabled, therefore directly move camera to current location
                     Location location = mapboxMap.getMyLocation();
-                    if (zoomFactor >= 0) {
-                        CameraPosition cameraPosition = new CameraPosition.Builder().target(getLatLng(location)).zoom(zoomFactor).build();
+                    if (currentZoom >= 0) {
+                        CameraPosition cameraPosition = new CameraPosition.Builder().target(getLatLng(location)).zoom(currentZoom).build();
                         mapboxMap.setCameraPosition(cameraPosition);
                     } else {
                         moveCamera(location, DEFAULT_ZOOM_FACTOR, CAMERA_ANIMATION_LONG);
@@ -551,7 +553,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      */
     private void moveCamera(final LatLng position, final int animationLength) {
         if (position != null) {
-            double currentZoom = mapboxMap.getCameraPosition().zoom;
             CameraPosition cameraPosition = new CameraPosition.Builder().target(position).zoom(currentZoom).build();
             if (animationLength >= 0) {
                 mapboxMap.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition), animationLength);
@@ -573,7 +574,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         SharedPreferences data = getSharedPreferences(KEY_SHARED_PREFERENCES_MAP, Context.MODE_PRIVATE);
         SharedPreferences.Editor edit = data.edit();
         edit.putBoolean(KEY_PATH_TRACKING_ENABLED, pathTrackingEnabled);
-        edit.putFloat(KEY_ZOOM_FACTOR, (float) mapboxMap.getCameraPosition().zoom);
+        edit.putFloat(KEY_ZOOM_FACTOR, (float) currentZoom);
         edit.commit();
     }
 
@@ -583,7 +584,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     private void loadStatus() {
         SharedPreferences data = getSharedPreferences(KEY_SHARED_PREFERENCES_MAP, Context.MODE_PRIVATE);
         pathTrackingEnabled = data.getBoolean(KEY_PATH_TRACKING_ENABLED, false);
-        zoomFactor = data.getFloat(KEY_ZOOM_FACTOR, -1);
+        currentZoom = (double) data.getFloat(KEY_ZOOM_FACTOR, -1);
     }
 
     /**
@@ -787,10 +788,10 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
             case R.id.fabLocation:
                 Location location = mapboxMap.getMyLocation();
                 if (location != null) {
-                    if (mapboxMap.getCameraPosition().zoom == 0) {
-                        moveCamera(location, DEFAULT_ZOOM_FACTOR, CAMERA_ANIMATION_LONG);
-                    } else {
+                    if (currentZoom >= 0) {
                         moveCamera(location, CAMERA_ANIMATION_SHORT);
+                    } else {
+                        moveCamera(location, DEFAULT_ZOOM_FACTOR, CAMERA_ANIMATION_LONG);
                     }
                 } else {
                     Toast.makeText(Map.this, R.string.gps_not_available, Toast.LENGTH_SHORT).show();
@@ -841,7 +842,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      */
     @Override
     public void onCameraIdle() {
-
+        currentZoom = mapboxMap.getCameraPosition().zoom;
     }
 
     /**
