@@ -88,6 +88,8 @@ public class TrackingService extends Service {
     public void onDestroy() {
         if (useExternalGpsDevice) {
             // destroy LocationManager for external GPS provider
+            gps.stopPolling();
+            gps = null;
         } else {
             // destroy LocationManager for built-in GPS provider
             locationManager.removeUpdates(locationListener);

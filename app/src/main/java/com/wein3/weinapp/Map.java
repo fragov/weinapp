@@ -221,6 +221,10 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
         notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
 
+        if (useExternalGpsDevice) {
+            GPS.getInstance(getApplicationContext());
+        }
+
         // set Toolbar
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
