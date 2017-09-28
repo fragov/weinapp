@@ -330,7 +330,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                     for (Document document : documents) {
                         try {
                             GeoJsonSource geoJsonSource = new GeoJsonSource(document.getId(),
-                                    document.getProperty("featureCollection").toString());
+                                    document.getProperty("geometry").toString());
                             mapboxMap.addSource(geoJsonSource);
                             LineLayer lineLayer = new LineLayer(document.getId(), document.getId());
                             mapboxMap.addLayer(lineLayer);
@@ -648,7 +648,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                 List<Feature> features = new ArrayList<>();
                 features.add(Feature.fromGeometry(Polygon.fromCoordinates(positions)));
                 FeatureCollection featureCollection = FeatureCollection.fromFeatures(features);
-                documentContent.put("featureCollection", featureCollection.toJson());
+                documentContent.put("geometry", featureCollection.toJson());
                 mainDatabase.insert(documentContent);
                 mapboxMap.addPolygon(polygonOptions);
                 mapboxMap.removePolyline(polylineOptions.getPolyline());
@@ -860,8 +860,16 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      */
     @Override
     public void onDocumentAdded(Document document) {
-        this.documents.remove(document);
-        // TODO: Remove object from map
+        this.documents.add(document);
+        try {
+            GeoJsonSource geoJsonSource = new GeoJsonSource(document.getId(),
+                    document.getProperty("geometry").toString());
+            mapboxMap.addSource(geoJsonSource);
+            LineLayer lineLayer = new LineLayer(document.getId(), document.getId());
+            mapboxMap.addLayer(lineLayer);
+        } catch (Exception e) {
+            Log.d(DEBUG_TAG, "Cannot add polygons from Database to Map", e);
+        }
     }
 
     /**
@@ -870,8 +878,8 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      */
     @Override
     public void onDocumentRemoved(Document document) {
-        this.documents.add(document);
-        // TODO: Add object to map
+        this.documents.remove(document);
+        mapboxMap.removeLayer(document.getId());
     }
 
     /**
