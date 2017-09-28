@@ -64,7 +64,7 @@ import java.util.List;
 /**
  * Main activity containing the map.
  */
-public class Map extends AppCompatActivity implements View.OnClickListener, NavigationView.OnNavigationItemSelectedListener {
+public class Map extends AppCompatActivity implements View.OnClickListener, NavigationView.OnNavigationItemSelectedListener, MapboxMap.OnCameraIdleListener {
 
     /**
      * Default zoom factor.
@@ -191,6 +191,11 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
 
     private String description;
     private Area newArea;
+
+    /**
+     * Overridden methods of Activity class.
+     * =====================================
+     */
 
     /**
      * Create activity and instantiate views and global variables.
@@ -334,49 +339,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     }
 
     /**
-     * Take care of popping the fragment back stack or finishing the activity
-     * as appropriate.
-     */
-    @Override
-    public void onBackPressed() {
-        DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
-        if (drawer.isDrawerOpen(GravityCompat.START)) {
-            drawer.closeDrawer(GravityCompat.START);
-        } else {
-            super.onBackPressed();
-        }
-    }
-
-    /**
-     * Initialize the contents of the Activity's standard options menu.
-     *
-     * @param menu The options menu in which you place your items.
-     * @return You must return true for the menu to be displayed;
-     * if you return false it will not be shown.
-     */
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.map, menu);
-        return true;
-    }
-
-    /**
-     * This hook is called whenever an item in your options menu is selected.
-     *
-     * @param item The menu item that was selected.
-     * @return boolean Return false to allow normal menu processing to
-     * proceed, true to consume it here.
-     */
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        int id = item.getItemId();
-        if (id == R.id.action_settings) {
-            return true;
-        }
-        return super.onOptionsItemSelected(item);
-    }
-
-    /**
      * Start activity.
      */
     @Override
@@ -456,58 +418,76 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     }
 
     /**
-     * Show dialog to enable GPS.
-     */
-    private void showGPSDisabledDialog() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle(R.string.gps_disabled_dialog_title);
-        builder.setMessage(R.string.gps_disabled_dialog_message);
-        builder.setPositiveButton(R.string.gps_disabled_dialog_button_yes, new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                startActivityForResult(
-                        new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS),
-                        REQUEST_CODE_LOCATION_SOURCE_SETTINGS
-                );
-            }
-        });
-        builder.setNegativeButton(R.string.gps_disabled_dialog_button_no, new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                dialog.dismiss();
-            }
-        });
-        builder.create();
-        builder.show();
-    }
-
-    /**
-     * Replace the current polyline with a new one.
+     * Called when an activity you launched exits, giving you the requestCode
+     * you started it with, the resultCode it returned, and any additional
+     * data from it.
      *
-     * @param polylineOptions coordinates of the new polyline as PolylineOptions instance
+     * @param requestCode The integer request code originally supplied to
+     *                    startActivityForResult(), allowing you to identify who this
+     *                    result came from.
+     * @param resultCode  The integer result code returned by the child activity
+     *                    through its setResult().
+     * @param data        An Intent, which can return result data to the caller.
      */
-    private void updatePolyline(final PolylineOptions polylineOptions) {
-        if (currentPolyline != null) {
-            mapboxMap.removePolyline(currentPolyline);
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (resultCode == RESULT_CANCELED) {
+            if (requestCode == REQUEST_CODE_LOCATION_SOURCE_SETTINGS) {
+                Location location = mapboxMap.getMyLocation();
+                moveCamera(location, DEFAULT_ZOOM_FACTOR, CAMERA_ANIMATION_LONG);
+            }
+            return;
         }
-        currentPolyline = mapboxMap.addPolyline(polylineOptions);
-        currentPolyline.setColor(Color.RED);
-        currentPolyline.setWidth(3);
     }
 
     /**
-     * Convert Location to LatLng.
-     *
-     * @param location current location as Location instance
-     * @return current location as LatLng instance or null, if location instance is invalid
+     * Take care of popping the fragment back stack or finishing the activity
+     * as appropriate.
      */
-    private LatLng getLatLng(final Location location) {
-        if (location != null) {
-            return new LatLng(location.getLatitude(), location.getLongitude());
+    @Override
+    public void onBackPressed() {
+        DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
+        if (drawer.isDrawerOpen(GravityCompat.START)) {
+            drawer.closeDrawer(GravityCompat.START);
         } else {
-            return null;
+            super.onBackPressed();
         }
     }
+
+    /**
+     * Initialize the contents of the Activity's standard options menu.
+     *
+     * @param menu The options menu in which you place your items.
+     * @return You must return true for the menu to be displayed;
+     * if you return false it will not be shown.
+     */
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.map, menu);
+        return true;
+    }
+
+    /**
+     * This hook is called whenever an item in your options menu is selected.
+     *
+     * @param item The menu item that was selected.
+     * @return boolean Return false to allow normal menu processing to
+     * proceed, true to consume it here.
+     */
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        int id = item.getItemId();
+        if (id == R.id.action_settings) {
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    /**
+     * Methods to move the camera.
+     * ===========================
+     */
 
     /**
      * Move camera to given location (with animation).
@@ -562,6 +542,31 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     }
 
     /**
+     * Move camera to given location (with animation) while preserving the current zoom factor.
+     * If the given LatLng instance is null, do nothing. If the given animation length is
+     * invalid, do not use an animation.
+     *
+     * @param position        chosen position as LatLng instance
+     * @param animationLength chosen length of the animation in milliseconds
+     */
+    private void moveCamera(final LatLng position, final int animationLength) {
+        if (position != null) {
+            double currentZoom = mapboxMap.getCameraPosition().zoom;
+            CameraPosition cameraPosition = new CameraPosition.Builder().target(position).zoom(currentZoom).build();
+            if (animationLength >= 0) {
+                mapboxMap.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition), animationLength);
+            } else {
+                mapboxMap.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
+            }
+        }
+    }
+
+    /**
+     * Methods to update SharedPreferences.
+     * ====================================
+     */
+
+    /**
      * Save current status variables to SharedPreferences.
      */
     private void saveStatus() {
@@ -582,24 +587,9 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     }
 
     /**
-     * Move camera to given location (with animation) while preserving the current zoom factor.
-     * If the given LatLng instance is null, do nothing. If the given animation length is
-     * invalid, do not use an animation.
-     *
-     * @param position        chosen position as LatLng instance
-     * @param animationLength chosen length of the animation in milliseconds
+     * Methods for starting and stopping GPS tracking.
+     * ================================================
      */
-    private void moveCamera(final LatLng position, final int animationLength) {
-        if (position != null) {
-            double currentZoom = mapboxMap.getCameraPosition().zoom;
-            CameraPosition cameraPosition = new CameraPosition.Builder().target(position).zoom(currentZoom).build();
-            if (animationLength >= 0) {
-                mapboxMap.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition), animationLength);
-            } else {
-                mapboxMap.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
-            }
-        }
-    }
 
     /**
      * Start printing the GPS coordinates onto the map.
@@ -685,28 +675,89 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     }
 
     /**
-     * Called when an activity you launched exits, giving you the requestCode
-     * you started it with, the resultCode it returned, and any additional
-     * data from it.
-     *
-     * @param requestCode The integer request code originally supplied to
-     *                    startActivityForResult(), allowing you to identify who this
-     *                    result came from.
-     * @param resultCode  The integer result code returned by the child activity
-     *                    through its setResult().
-     * @param data        An Intent, which can return result data to the caller.
+     * Helper methods.
+     * ===============
      */
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (resultCode == RESULT_CANCELED) {
-            if (requestCode == REQUEST_CODE_LOCATION_SOURCE_SETTINGS) {
-                Location location = mapboxMap.getMyLocation();
-                moveCamera(location, DEFAULT_ZOOM_FACTOR, CAMERA_ANIMATION_LONG);
-            }
-            return;
+
+    /**
+     * Convert Location to LatLng.
+     *
+     * @param location current location as Location instance
+     * @return current location as LatLng instance or null, if location instance is invalid
+     */
+    private LatLng getLatLng(final Location location) {
+        if (location != null) {
+            return new LatLng(location.getLatitude(), location.getLongitude());
+        } else {
+            return null;
         }
     }
+
+    /**
+     * Replace the current polyline with a new one.
+     *
+     * @param polylineOptions coordinates of the new polyline as PolylineOptions instance
+     */
+    private void updatePolyline(final PolylineOptions polylineOptions) {
+        if (currentPolyline != null) {
+            mapboxMap.removePolyline(currentPolyline);
+        }
+        currentPolyline = mapboxMap.addPolyline(polylineOptions);
+        currentPolyline.setColor(Color.RED);
+        currentPolyline.setWidth(3);
+    }
+
+    /**
+     * Show dialog to enable GPS.
+     */
+    private void showGPSDisabledDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle(R.string.gps_disabled_dialog_title);
+        builder.setMessage(R.string.gps_disabled_dialog_message);
+        builder.setPositiveButton(R.string.gps_disabled_dialog_button_yes, new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                startActivityForResult(
+                        new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS),
+                        REQUEST_CODE_LOCATION_SOURCE_SETTINGS
+                );
+            }
+        });
+        builder.setNegativeButton(R.string.gps_disabled_dialog_button_no, new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                dialog.dismiss();
+            }
+        });
+        builder.create();
+        builder.show();
+    }
+
+    /**
+     * Show notification while GPS tracking is running.
+     */
+    private void showRecordingNotification() {
+        // PendingIntent to launch our activity if the user selects this notification
+        PendingIntent contentIntent = PendingIntent.getActivity(this, 0,
+                new Intent(this, Map.class), 0);
+        // set the info for the views that show in the notification panel.
+        Notification notification = new Notification.Builder(this)
+                .setSmallIcon(R.drawable.ic_record) // the status icon
+                .setTicker(getText(R.string.tracking_service_running)) // the status text
+                .setWhen(System.currentTimeMillis()) // the time stamp
+                .setContentTitle(getText(R.string.tracking_service_running)) // the label of the entry
+                .setContentIntent(contentIntent) // the intent to send when the entry is clicked
+                .setOngoing(true) // makes the swipe of notification impossible
+                .build();
+        // send the notification.
+        notificationManager.notify(R.string.tracking_service_running, notification);
+    }
+
+    /**
+     * Methods provided by View.OnClickListener interface.
+     * Handling of touch events on the FloatingActionButtons.
+     * ======================================================
+     */
 
     /**
      * Called when a view has been clicked.
@@ -751,6 +802,12 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     }
 
     /**
+     * Methods provided by NavigationView.OnNavigationItemSelectedListener interface.
+     * Handling of touch events on an item within the navigation bar.
+     * ==============================================================
+     */
+
+    /**
      * Called when an item in the navigation menu is selected.
      *
      * @param item The selected item
@@ -774,24 +831,23 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     }
 
     /**
-     * Show notification while GPS tracking is running.
+     * Methods provided by MapboxMap.OnCameraIdleListener interface.
+     * Store information of the camera view when camera movement has ended.
+     * ====================================================================
      */
-    private void showRecordingNotification() {
-        // PendingIntent to launch our activity if the user selects this notification
-        PendingIntent contentIntent = PendingIntent.getActivity(this, 0,
-                new Intent(this, Map.class), 0);
-        // set the info for the views that show in the notification panel.
-        Notification notification = new Notification.Builder(this)
-                .setSmallIcon(R.drawable.ic_record) // the status icon
-                .setTicker(getText(R.string.tracking_service_running)) // the status text
-                .setWhen(System.currentTimeMillis()) // the time stamp
-                .setContentTitle(getText(R.string.tracking_service_running)) // the label of the entry
-                .setContentIntent(contentIntent) // the intent to send when the entry is clicked
-                .setOngoing(true) // makes the swipe of notification impossible
-                .build();
-        // send the notification.
-        notificationManager.notify(R.string.tracking_service_running, notification);
+
+    /**
+     * Called when camera movement has ended.
+     */
+    @Override
+    public void onCameraIdle() {
+
     }
+
+    /**
+     * Custom BroadcastReceiver.
+     * =========================
+     */
 
     /**
      * Custom BroadcastReceiver to handle location updates from GPS tracking service.
