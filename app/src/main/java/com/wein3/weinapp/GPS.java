@@ -38,8 +38,6 @@ import java.util.Set;
  *
  * TODO look at log.txt on Desktop for random, weirdly corrupted and error-causing examples...
  *
- * TODO handle slowdown despite Threads (maybe too many synchronized?)
- *
  * TODO handle crash on ending Activity while Thread is running
  *
  * TODO handle crash on removing USB GPS device while Thread is running
@@ -47,6 +45,12 @@ import java.util.Set;
  * TODO make GPS useable without restart...
  *
  * TODO make more comments than Javadocs
+ *
+ * TODO for use in TrackingService: make sure that the context set in the activity survives when that activity is killed and we want to access this context in the service. Other idea: make method to set a new context (for now, getInstance(Context) does the same).
+ *
+ * TODO handle closit(): device is set null, but this interferes with the singleton concept
+ *
+ * TODO Please be aware of the fact that the Service can still run when onDestroy() of Activity is called
  *
  */
 public class GPS implements GPSDataSender {
@@ -349,8 +353,10 @@ public class GPS implements GPSDataSender {
     /**
      * This calculates the current location.
      * Please be aware that this method needs a lot of time.
+     *
+     * TODO removing the synchronized keyword should not have been done, but somehow it fixed the slowdown problem (yay)
      */
-    private synchronized void setLastKnownLatLng() {
+    private void setLastKnownLatLng() {
         String gga = getFirstGGAString();
         loggah("GGA String - " + gga, false);
         this.lastKnownLatLng = ggaToLatLng(gga);
@@ -830,8 +836,10 @@ public class GPS implements GPSDataSender {
     }
 
     @Override
-    public synchronized void updateReceivers() {
-        //we could do this with an ArrayList, but we can only use it once
+    public void updateReceivers() {
+        //TODO synchronized should not have been removed, too. But I think, for now it's the best to
+        //TODO reduce the synchronized keyword overall because it's rather error-prone
+        //we could do this with an ArrayList, but we can only use it once anyways
         this.gpsDataReceiver.onUSBGPSLocationChanged(getLastKnownLatLng());
     }
 
@@ -870,7 +878,6 @@ public class GPS implements GPSDataSender {
             this.directPoller = null;
             isPollerSet = false;
             return false;
-            //TODO don't use return values. Work out repeat strategy in this class
         }
     }
 
@@ -912,6 +919,9 @@ public class GPS implements GPSDataSender {
     private class PollingClock implements Runnable{
         /**
          * This is the polling interval.
+         *
+         * Even if it's not in use, you should keep this in case we want to implement a restriction
+         * for the polling frequency.
          */
         long wait;
 
@@ -923,7 +933,7 @@ public class GPS implements GPSDataSender {
         /**
          * This constructor is setting the polling interval and the flag.
          *
-         * @param time
+         * @param time - polling interval
          */
         public PollingClock(long time) {
             this.wait = time;
@@ -1018,11 +1028,12 @@ public class GPS implements GPSDataSender {
     private DirectPoller directPoller;
 
     /**
-     * This would be the best way to poll data without a fixes interval, but somehow it doesn't work...
+     * This would be the best way to poll data without a fixed interval, but somehow it doesn't work...
      *
      * TODO : this is the more elegant way, but it doesn't really work...
      *
-     * TODO make inner Javadocs
+     * Maybe it has something to do with the wait() and notify() process between PollingClock
+     * and Poller above?
      */
     private class DirectPoller implements Runnable {
         /**

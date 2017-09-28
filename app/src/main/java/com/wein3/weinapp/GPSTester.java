@@ -41,24 +41,16 @@ public class GPSTester extends AppCompatActivity implements GPSDataReceiver {
         getLatLong.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                /*
-                Intent intent = getIntent();
-                device = (UsbDevice) intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
-                */
                 if(!gps.hasDevice()) {
                     loggah("No device found upon button usage.", true);
                     return;
                 }
-
                 if(!gps.isPollerSet()) {
-                    //don't use that when my awesome Observer thingy is implemented
-                    //LatLng res = gps.getLastKnownLatLng();
-                    //GPSTester.this.onUSBGPSLocationChanged(res);
-
-
                     gps.startPolling();
+                    getLatLong.setText("stop polling");
                 } else {
                     gps.stopPolling();
+                    getLatLong.setText("start polling");
                 }
             }
         });
