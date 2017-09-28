@@ -16,9 +16,9 @@ import java.util.List;
  */
 public class HelperDatabase {
 
-    private SQLiteDatabase sqLiteDatabase;
-    private final String DATABASE_FILE = "helper_database.db";
-    private final String CURRENT_PATH_TABLE = "current_path";
+    private static SQLiteDatabase sqLiteDatabase;
+    private static final String DATABASE_FILE = "helper_database.db";
+    private static final String CURRENT_PATH_TABLE = "current_path";
 
     /**
      * Open or create helper database.
@@ -26,10 +26,12 @@ public class HelperDatabase {
      *
      * @param application current Application instance.
      */
-    public void init(final Application application) {
-        String path = application.getFilesDir().getParent();
-        sqLiteDatabase = SQLiteDatabase.openOrCreateDatabase(path + "/" + DATABASE_FILE, null);
-        sqLiteDatabase.execSQL("CREATE TABLE IF NOT EXISTS " + CURRENT_PATH_TABLE + "(latitude REAL NOT NULL, longitude REAL NOT NULL);");
+    public static void openDatabase(final Application application) {
+        if (sqLiteDatabase == null) {
+            String path = application.getFilesDir().getParent();
+            sqLiteDatabase = SQLiteDatabase.openOrCreateDatabase(path + "/" + DATABASE_FILE, null);
+            sqLiteDatabase.execSQL("CREATE TABLE IF NOT EXISTS " + CURRENT_PATH_TABLE + "(latitude REAL NOT NULL, longitude REAL NOT NULL);");
+        }
     }
 
     /**
@@ -38,7 +40,7 @@ public class HelperDatabase {
      * @param latitude  double value representing the latitude.
      * @param longitude double value representing the longitude.
      */
-    public void addToCurrentPath(final double latitude, final double longitude) {
+    public static void addToCurrentPath(final double latitude, final double longitude) {
         ContentValues values = new ContentValues();
         values.put("latitude", latitude);
         values.put("longitude", longitude);
@@ -50,7 +52,7 @@ public class HelperDatabase {
      *
      * @return List of LatLng instances representing the path.
      */
-    public List<LatLng> getCurrentPath() {
+    public static List<LatLng> getCurrentPath() {
         List<LatLng> coordinates = new ArrayList<>();
         Cursor cursor = sqLiteDatabase.query(CURRENT_PATH_TABLE, null, null, null, null, null, null);
         if (cursor.moveToFirst()) {
@@ -68,15 +70,16 @@ public class HelperDatabase {
     /**
      * Delete the recently saved path.
      */
-    public void clearTable() {
+    public static void clearTable() {
         sqLiteDatabase.execSQL("DELETE FROM " + CURRENT_PATH_TABLE);
     }
 
     /**
      * Safely close the database.
      */
-    public void close() {
+    public static void close() {
         sqLiteDatabase.close();
+        sqLiteDatabase = null;
     }
 
 }

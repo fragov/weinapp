@@ -104,6 +104,11 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     private final String KEY_PATH_TRACKING_ENABLED = "path_tracking_enabled";
 
     /**
+     * Key to store external GPS device flag.
+     */
+    private final String KEY_USE_EXTERNAL_GPS_DEVICE = "use_external_gps_device";
+
+    /**
      * Key to store zoom factor.
      */
     private final String KEY_ZOOM_FACTOR = "zoom_factor";
@@ -133,11 +138,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      * Database handler to store polygons.
      */
     private CouchDB mainDatabase;
-
-    /**
-     * Database handler to temporarily store the current path.
-     */
-    private HelperDatabase helperDatabase;
 
     /**
      * MapView containing the map.
@@ -191,11 +191,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     private FloatingActionButton fabPath;
 
     /**
-     * Intent to start GPS tracking service.
-     */
-    private Intent trackingServiceIntent;
-
-    /**
      * Couchbase data.
      */
     private List<Document> documents;
@@ -231,8 +226,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         mainDatabase.registerObserver(this);
 
         // create or open helper database
-        helperDatabase = new HelperDatabase();
-        helperDatabase.init(getApplication());
+        HelperDatabase.openDatabase(getApplication());
 
         // set Toolbar
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
@@ -292,7 +286,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                 mapboxMap.setOnCameraIdleListener(Map.this);
                 // add the recently saved polyline from the database
                 polylineOptions = new PolylineOptions();
-                List<LatLng> coordinates = helperDatabase.getCurrentPath();
+                List<LatLng> coordinates = HelperDatabase.getCurrentPath();
                 for (LatLng position : coordinates) {
                     polylineOptions.add(position);
                 }
@@ -403,13 +397,15 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      * destroyed and recreated when changing from portrait to landscape
      * mode or when switching activities within the app. In this case,
      * some status variables have to be saved as SharedPreferences to
-     * be able to restore the instance state on recreation.
+     * be able to restore the instance state on recreation. Correspondingly, the database has to be kept open
      */
     @Override
     protected void onDestroy() {
         super.onDestroy();
         mapView.onDestroy();
-        helperDatabase.close();
+        if (!pathTrackingEnabled) {
+            HelperDatabase.close();
+        }
         saveStatus();
     }
 
@@ -610,6 +606,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         SharedPreferences data = getSharedPreferences(KEY_SHARED_PREFERENCES_MAP, Context.MODE_PRIVATE);
         SharedPreferences.Editor edit = data.edit();
         edit.putBoolean(KEY_PATH_TRACKING_ENABLED, pathTrackingEnabled);
+        edit.putBoolean(KEY_USE_EXTERNAL_GPS_DEVICE, useExternalGpsDevice);
         edit.putFloat(KEY_ZOOM_FACTOR, (float) currentZoom);
         edit.commit();
     }
@@ -620,6 +617,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     private void loadStatus() {
         SharedPreferences data = getSharedPreferences(KEY_SHARED_PREFERENCES_MAP, Context.MODE_PRIVATE);
         pathTrackingEnabled = data.getBoolean(KEY_PATH_TRACKING_ENABLED, false);
+        useExternalGpsDevice = data.getBoolean(KEY_USE_EXTERNAL_GPS_DEVICE, false);
         currentZoom = (double) data.getFloat(KEY_ZOOM_FACTOR, -1);
     }
 
@@ -634,9 +632,9 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      */
     private void startNewRoute() {
         // start GPS tracking service
-        trackingServiceIntent = new Intent(this, TrackingService.class);
-        trackingServiceIntent.putExtra(Variables.KEY_USE_EXTERNAL_GPS_DEVICE, useExternalGpsDevice);
-        startService(trackingServiceIntent);
+        Intent intent = new Intent(this, TrackingService.class);
+        intent.putExtra(Variables.KEY_USE_EXTERNAL_GPS_DEVICE, useExternalGpsDevice);
+        startService(intent);
         // show corresponding notificationf
         showRecordingNotification();
         // set another icon while recording
@@ -650,11 +648,12 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      */
     private void stopCurrentRoute() {
         // stop GPS tracking service
-        stopService(trackingServiceIntent);
+        Intent intent = new Intent(this, TrackingService.class);
+        stopService(intent);
         // cancel notification
         notificationManager.cancel(KEY_NOTIFICATION_MANAGER);
         // cleanup of helper database
-        helperDatabase.clearTable();
+        HelperDatabase.clearTable();
         // save the polyline in main database
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle(R.string.save_polygon_dialog_enter_description);
@@ -947,7 +946,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                 } else {
                     // recently saved position available, therefore just add it to the polyline
                     polylineOptions.add(position);
-                    helperDatabase.addToCurrentPath(latitude, longitude);
+                    HelperDatabase.addToCurrentPath(latitude, longitude);
                 }
             }
             currentPosition = position;

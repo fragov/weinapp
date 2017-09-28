@@ -21,7 +21,6 @@ import com.wein3.weinapp.database.HelperDatabase;
  */
 public class TrackingService extends Service {
 
-    private HelperDatabase helperDatabase;
     private LocationManager locationManager;
     private TrackingLocationListener locationListener;
     private GPS gps;
@@ -76,8 +75,7 @@ public class TrackingService extends Service {
             }
         }
         // initialize helper database
-        helperDatabase = new HelperDatabase();
-        helperDatabase.init(getApplication());
+        HelperDatabase.openDatabase(getApplication());
         return START_STICKY;
     }
 
@@ -86,6 +84,7 @@ public class TrackingService extends Service {
      */
     @Override
     public void onDestroy() {
+        super.onDestroy();
         if (useExternalGpsDevice) {
             // destroy LocationManager for external GPS provider
             gps.stopPolling();
@@ -95,7 +94,6 @@ public class TrackingService extends Service {
             locationManager.removeUpdates(locationListener);
             locationManager = null;
         }
-        super.onDestroy();
     }
 
     /**
@@ -112,7 +110,7 @@ public class TrackingService extends Service {
         boolean resultCode = LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
         // check if broadcast was successful and save the coordinates in the database if not
         if (!resultCode) {
-            helperDatabase.addToCurrentPath(latitude, longitude);
+            HelperDatabase.addToCurrentPath(latitude, longitude);
         }
     }
 
