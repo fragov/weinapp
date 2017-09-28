@@ -42,17 +42,13 @@ import java.util.Set;
  *
  * TODO handle crash on removing USB GPS device while Thread is running
  *
- * TODO make GPS useable without restart...
- *
  * TODO make more comments than Javadocs
  *
  * TODO for use in TrackingService: make sure that the context set in the activity survives when that activity is killed and we want to access this context in the service. Other idea: make method to set a new context (for now, getInstance(Context) does the same).
  *
  * TODO handle closit(): device is set null, but this interferes with the singleton concept
  *
- * TODO Please be aware of the fact that the Service can still run when onDestroy() of Activity is called
- *
- * TODO Process coordinates to right format
+ * TODO Please be aware of the fact that the Service can still run when onDestroy() of Activity is called (ignore this for now)
  *
  * TODO check checksum
  *
@@ -220,7 +216,6 @@ public class GPS implements GPSDataSender {
                 if(device != null) {
                     //PendingIntent permissionIntent = PendingIntent.getBroadcast(context, 0, new Intent(ACTION_USB_PERMISSION), 0);
                     //manager.requestPermission(device, permissionIntent);
-                    loggah("THIS IS THE BUG!!!", false);
                     onCreate();
                     loggah("ATTACHED - not null", false);
                 } else {
@@ -239,7 +234,7 @@ public class GPS implements GPSDataSender {
             String action  = intent.getAction();
 
             loggah("detachReceiver.onReceive()",false);
-            loggah("USB device detached", true);
+            loggah("USB device detached.", true);
 
             if(UsbManager.ACTION_USB_DEVICE_DETACHED.equals(action)) {
                 UsbDevice device = (UsbDevice) intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
@@ -315,16 +310,7 @@ public class GPS implements GPSDataSender {
 
         manager = (UsbManager) context.getSystemService(Context.USB_SERVICE);
 
-        IntentFilter intentFilter = new IntentFilter(ACTION_USB_PERMISSION);
-        context.registerReceiver(permissionReceiver, intentFilter);
-
-        IntentFilter intentFilter2 = new IntentFilter(UsbManager.ACTION_USB_DEVICE_ATTACHED);
-        context.registerReceiver(attachReceiver, intentFilter2);
-
-        IntentFilter intentFilter3 = new IntentFilter(UsbManager.ACTION_USB_DEVICE_DETACHED);
-        context.registerReceiver(detachReceiver, intentFilter3);
-
-        loggah("Receivers registered.", false);
+        this.registerBroadcastReceivers();
 
         this.onCreate();
     }
@@ -341,8 +327,34 @@ public class GPS implements GPSDataSender {
             GPS.gpsSingleton = new GPS(context);
         } else {
             GPS.context = context;
+            GPS.gpsSingleton.registerBroadcastReceivers();
+        }
+        if(GPS.gpsSingleton.device == null) {
+            GPS.gpsSingleton.onCreate();
+            GPS.gpsSingleton.loggah("getInstance() -> onCreate()",false);
+            if(GPS.gpsSingleton.device != null) {
+                GPS.gpsSingleton.init();
+                GPS.gpsSingleton.loggah("getInstance() -> init()",false);
+            }
         }
         return GPS.gpsSingleton;
+    }
+
+    /**
+     * This method is used to register the Broadcast Receivers. That's necessary every time a new
+     * Context is set.
+     */
+    private void registerBroadcastReceivers() {
+        IntentFilter intentFilter = new IntentFilter(ACTION_USB_PERMISSION);
+        context.registerReceiver(permissionReceiver, intentFilter);
+
+        IntentFilter intentFilter2 = new IntentFilter(UsbManager.ACTION_USB_DEVICE_ATTACHED);
+        context.registerReceiver(attachReceiver, intentFilter2);
+
+        IntentFilter intentFilter3 = new IntentFilter(UsbManager.ACTION_USB_DEVICE_DETACHED);
+        context.registerReceiver(detachReceiver, intentFilter3);
+
+        loggah("Receivers registered.", false);
     }
 
     //-------------READING METHODS------------------------------------------------------------------
@@ -350,7 +362,7 @@ public class GPS implements GPSDataSender {
     /**
      * This returns the last known location. If no Poller is set, this method calls setLastKnownLatLng.
      * Please be aware that that method would be executed in the UI Thread so it is not recommended
-     * to use it directly. Instead, consider using a poller.
+     * to use it directly. Instead, consider using a Poller.
      *
      * @return - last known location in LatLng
      */
@@ -610,6 +622,7 @@ public class GPS implements GPSDataSender {
         if(manager.getDeviceList().isEmpty()) emptyDeviceListHoldsAtOnCreate = true;
         if(nullHoldsAtOnCreate || emptyDeviceListHoldsAtOnCreate) {
             loggah("Maybe no device at startup: " + nullHoldsAtOnCreate + ", " + emptyDeviceListHoldsAtOnCreate, false);
+            device = null;
             return;
         }
 
@@ -635,7 +648,7 @@ public class GPS implements GPSDataSender {
     /**
      * Used to close connection, remove device and reset state.
      */
-    private void closit() {
+    public void closit() {
         loggah("Entered closit().", false);
         this.stopPolling();
         if(connection != null) {
@@ -859,9 +872,7 @@ public class GPS implements GPSDataSender {
     @Override
     public void registerReceiver(GPSDataReceiver gpsDataReceiver) {
         //we could do this with an ArrayList, but we can only use it once
-        if(this.gpsDataReceiver == null) {
-            this.gpsDataReceiver = gpsDataReceiver;
-        }
+        this.gpsDataReceiver = gpsDataReceiver;
     }
 
     @Override
@@ -951,6 +962,7 @@ public class GPS implements GPSDataSender {
                 }
             }
         }
+        almostDead = false;
         isPollerSet = false;
     }
 

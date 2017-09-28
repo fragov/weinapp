@@ -36,7 +36,6 @@ public class GPSTester extends AppCompatActivity implements GPSDataReceiver {
         gps = GPS.getInstance(this);
         gps.registerReceiver(this);
         gps.setPollingInterval(10000);
-        gps.startPolling();
 
         getLatLong.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -69,7 +68,8 @@ public class GPSTester extends AppCompatActivity implements GPSDataReceiver {
 
     @Override
     protected void onDestroy() {
-        if(gps != null) gps.onDestroy();
+        if(gps != null) gps.closit();
+        loggah("GPSTester.closit()", false);
         super.onDestroy();
     }
 
