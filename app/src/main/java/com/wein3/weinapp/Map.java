@@ -66,8 +66,12 @@ import java.util.List;
 /**
  * Main activity containing the map.
  */
-public class Map extends AppCompatActivity implements View.OnClickListener,
-        NavigationView.OnNavigationItemSelectedListener, DatabaseObserver, MapboxMap.OnCameraIdleListener {
+public class Map extends AppCompatActivity implements View.OnClickListener, NavigationView.OnNavigationItemSelectedListener, MapboxMap.OnCameraIdleListener, DatabaseObserver {
+
+    /**
+     * Debug tag for logging.
+     */
+    private final String DEBUG_TAG = this.getClass().getSimpleName();
 
     /**
      * Default zoom factor.
@@ -108,8 +112,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener,
      * Key for Map activity's SharedPreferences.
      */
     private final String KEY_SHARED_PREFERENCES_MAP = "shared_preferences_map";
-
-    private final String TAG = "MapActivity";
 
     /**
      * Boolean flag indicating whether or not GPS tracking of one's current path is enabled.
@@ -158,7 +160,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener,
     private Polyline currentPolyline;
 
     /**
-     * LatLng instance containing the latest position from the TrackingService.
+     * LatLng instance containing the latest position received from the TrackingService.
      */
     private LatLng currentPosition;
 
@@ -193,7 +195,9 @@ public class Map extends AppCompatActivity implements View.OnClickListener,
      */
     private Intent trackingServiceIntent;
 
-
+    /**
+     * Couchbase data.
+     */
     private List<Document> documents;
 
     /**
@@ -323,7 +327,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener,
                 }
 
                 if (documents != null) {
-                    for (Document document: documents) {
+                    for (Document document : documents) {
                         try {
                             GeoJsonSource geoJsonSource = new GeoJsonSource(document.getId(),
                                     document.getProperty("featureCollection").toString());
@@ -331,7 +335,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener,
                             LineLayer lineLayer = new LineLayer(document.getId(), document.getId());
                             mapboxMap.addLayer(lineLayer);
                         } catch (Exception e) {
-                            Log.d(TAG, "Cannot add polygons from Database to Map", e);
+                            Log.d(DEBUG_TAG, "Cannot add polygons from Database to Map", e);
                         }
                     }
                 }
@@ -389,16 +393,13 @@ public class Map extends AppCompatActivity implements View.OnClickListener,
      * destroyed and recreated when changing from portrait to landscape
      * mode or when switching activities within the app. In this case,
      * some status variables have to be saved as SharedPreferences to
-     * be able to restore the instance state on recreation. Correspondingly,
-     * the database connection have to be kept open when GPS tracking is still enabled.
+     * be able to restore the instance state on recreation.
      */
     @Override
     protected void onDestroy() {
         super.onDestroy();
         mapView.onDestroy();
-        if (!pathTrackingEnabled) {
-            helperDatabase.close();
-        }
+        helperDatabase.close();
         saveStatus();
     }
 
@@ -609,19 +610,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener,
         startService(trackingServiceIntent);
         // show corresponding notification
         showRecordingNotification();
-        // check if the BroadcastReceiver already received a location update
-        if (currentPosition == null) {
-            // no current position available, therefore
-            // get initial location from Mapbox
-            Location location = mapboxMap.getMyLocation();
-            currentPosition = getLatLng(location);
-        }
-        // initialize a new polyline
-        polylineOptions = new PolylineOptions();
-        // add current location as first point to the polyline
-        polylineOptions.add(currentPosition);
-        // add polyline to the map
-        updatePolyline(polylineOptions);
         // set another icon while recording
         fabPath.setImageResource(R.drawable.ic_stop);
         // set flag indicating that further GPS tracking is enabled
@@ -678,6 +666,8 @@ public class Map extends AppCompatActivity implements View.OnClickListener,
         fabPath.setImageResource(R.drawable.ic_record);
         // set flag indicating that further GPS tracking is disabled
         pathTrackingEnabled = false;
+        // remove current position
+        currentPosition = null;
     }
 
     /**
@@ -851,26 +841,43 @@ public class Map extends AppCompatActivity implements View.OnClickListener,
     }
 
     /**
-     * Custom BroadcastReceiver.
-     * =========================
+     * Methods provided by DatabaseObserver interface handling the Couchbase database.
+     * ===============================================================================
      */
 
+    /**
+     *
+     * @param documents
+     */
     @Override
     public void onRegister(List<Document> documents) {
         this.documents = documents;
     }
 
+    /**
+     *
+     * @param document
+     */
     @Override
     public void onDocumentAdded(Document document) {
         this.documents.remove(document);
-        //ToDO: Remove object from map
+        // TODO: Remove object from map
     }
 
+    /**
+     *
+     * @param document
+     */
     @Override
     public void onDocumentRemoved(Document document) {
         this.documents.add(document);
-        //ToDo: Add object to map
+        // TODO: Add object to map
     }
+
+    /**
+     * Custom BroadcastReceiver.
+     * =========================
+     */
 
     /**
      * Custom BroadcastReceiver to handle location updates from GPS tracking service.
@@ -889,12 +896,23 @@ public class Map extends AppCompatActivity implements View.OnClickListener,
             // get location data included in the Intent
             double latitude = intent.getDoubleExtra(Variables.LATITUDE, 0);
             double longitude = intent.getDoubleExtra(Variables.LONGITUDE, 0);
-            currentPosition = new LatLng(latitude, longitude);
-            // store the location information if tracking is enabled
+            LatLng position = new LatLng(latitude, longitude);
+            // add the current location to the polyline only if tracking is enabled
             if (pathTrackingEnabled) {
-                polylineOptions.add(currentPosition);
-                helperDatabase.addToCurrentPath(latitude, longitude);
+                // check if the BroadcastReceiver already received a location update
+                if (currentPosition == null) {
+                    // no recently saved position available, therefore
+                    // add current location as first point to the polyline
+                    polylineOptions = new PolylineOptions();
+                    polylineOptions.add(position);
+                    updatePolyline(polylineOptions);
+                } else {
+                    // recently saved position available, therefore just add it to the polyline
+                    polylineOptions.add(position);
+                    helperDatabase.addToCurrentPath(latitude, longitude);
+                }
             }
+            currentPosition = position;
         }
     }
 
