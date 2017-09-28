@@ -219,6 +219,10 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         Mapbox.getInstance(this, getString(R.string.access_token));
         setContentView(R.layout.activity_map);
 
+        // create MapView instance
+        mapView = (MapView) findViewById(R.id.mapView);
+        mapView.onCreate(savedInstanceState);
+
         // reset instance state
         loadStatus();
 
@@ -229,14 +233,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         // create or open helper database
         helperDatabase = new HelperDatabase();
         helperDatabase.init(getApplication());
-
-        // initialize LocationManager and NotificationManager
-        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-        notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-
-        if (useExternalGpsDevice) {
-            GPS.getInstance(getApplicationContext());
-        }
 
         // set Toolbar
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
@@ -264,29 +260,35 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         NavigationView navigationView = (NavigationView) findViewById(R.id.nav_view);
         navigationView.setNavigationItemSelectedListener(this);
 
-        // request necessary location permissions
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            if (!ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_COARSE_LOCATION)) {
-                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, 1);
-            }
-        }
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            if (!ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_FINE_LOCATION)) {
-                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
-            }
-        }
+        // initialize NotificationManager in order to create an "is recording" notification
+        notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
 
-        // create MapView instance
-        mapView = (MapView) findViewById(R.id.mapView);
-        mapView.onCreate(savedInstanceState);
+        if (useExternalGpsDevice) {
+            // initialize external GPS provider
+            GPS.getInstance(getApplicationContext());
+        } else {
+            // initialize built-in GPS provider
+            locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+            // request necessary location permissions
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                if (!ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_FINE_LOCATION)) {
+                    ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
+                }
+            }
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                if (!ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_COARSE_LOCATION)) {
+                    ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, 1);
+                }
+            }
+        }
 
         // run custom initialization steps as soon as the MapboxMap instance is ready
         mapView.getMapAsync(new OnMapReadyCallback() {
             @Override
             public void onMapReady(MapboxMap mbMap) {
-                // get Mapbox map instance
+                // get MapboxMap instance
                 mapboxMap = mbMap;
-                // add listener for end of camera movement
+                // add camera movement listener
                 mapboxMap.setOnCameraIdleListener(Map.this);
                 // add the recently saved polyline from the database
                 polylineOptions = new PolylineOptions();
@@ -308,24 +310,32 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                         mapboxMap.getUiSettings().getCompassMarginRight(),
                         displayHeight - compassShift
                 );
-                // enable plotting of current (or last known) location
-                mapboxMap.setMyLocationEnabled(true);
-                // set camera view to its default position
-                if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-                    // GPS is enabled, therefore directly move camera to current location
-                    Location location = mapboxMap.getMyLocation();
-                    if (currentZoom >= 0) {
-                        CameraPosition cameraPosition = new CameraPosition.Builder().target(getLatLng(location)).zoom(currentZoom).build();
-                        mapboxMap.setCameraPosition(cameraPosition);
-                    } else {
-                        moveCamera(location, DEFAULT_ZOOM_FACTOR, CAMERA_ANIMATION_LONG);
-                    }
+
+                if (useExternalGpsDevice) {
+                    // disable default MapboxMap location listener
+                    mapboxMap.setMyLocationEnabled(false);
+                    // TODO: Plot current position according to GPS data from external device
                 } else {
-                    // GPS is not enabled, therefore show corresponding
-                    // dialog asking to enable GPS signal
-                    showGPSDisabledDialog();
+                    // enable default MapboxMap location listener
+                    mapboxMap.setMyLocationEnabled(true);
+                    // check if GPS signal is enabled
+                    if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                        // GPS is enabled, therefore directly move camera to current location
+                        Location location = mapboxMap.getMyLocation();
+                        if (currentZoom >= 0) {
+                            CameraPosition cameraPosition = new CameraPosition.Builder().target(getLatLng(location)).zoom(currentZoom).build();
+                            mapboxMap.setCameraPosition(cameraPosition);
+                        } else {
+                            moveCamera(location, DEFAULT_ZOOM_FACTOR, CAMERA_ANIMATION_LONG);
+                        }
+                    } else {
+                        // GPS is not enabled, therefore show corresponding
+                        // dialog asking to enable GPS signal
+                        showGPSDisabledDialog();
+                    }
                 }
 
+                // read all saved polygons from the database
                 if (documents != null) {
                     for (Document document : documents) {
                         try {
@@ -441,12 +451,31 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+
+        // Check for the request code regardless of the result code. In Android 4.3
+        // the GPS settings menu can only be exited by cancelling it. Maybe in other
+        // versions it is different.
+
         if (resultCode == RESULT_CANCELED) {
-            if (requestCode == REQUEST_CODE_LOCATION_SOURCE_SETTINGS) {
-                Location location = mapboxMap.getMyLocation();
-                moveCamera(location, DEFAULT_ZOOM_FACTOR, CAMERA_ANIMATION_LONG);
+            // invoked activity was cancelled without returning a result
+            switch (requestCode) {
+                case REQUEST_CODE_LOCATION_SOURCE_SETTINGS:
+                    Location location = mapboxMap.getMyLocation();
+                    moveCamera(location, DEFAULT_ZOOM_FACTOR, CAMERA_ANIMATION_LONG);
+                    break;
+                default:
+                    break;
             }
-            return;
+        } else {
+            // invoked activity successfully returns a result
+            switch (requestCode) {
+                case REQUEST_CODE_LOCATION_SOURCE_SETTINGS:
+                    Location location = mapboxMap.getMyLocation();
+                    moveCamera(location, DEFAULT_ZOOM_FACTOR, CAMERA_ANIMATION_LONG);
+                    break;
+                default:
+                    break;
+            }
         }
     }
 
@@ -781,15 +810,19 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                 }
                 break;
             case R.id.fabLocation:
-                Location location = mapboxMap.getMyLocation();
-                if (location != null) {
-                    if (currentZoom >= 0) {
-                        moveCamera(location, CAMERA_ANIMATION_SHORT);
-                    } else {
-                        moveCamera(location, DEFAULT_ZOOM_FACTOR, CAMERA_ANIMATION_LONG);
-                    }
+                if (useExternalGpsDevice) {
+                    // TODO: Move the camera to the latest location from the external GPS provider
                 } else {
-                    Toast.makeText(Map.this, R.string.gps_not_available, Toast.LENGTH_SHORT).show();
+                    Location location = mapboxMap.getMyLocation();
+                    if (location != null) {
+                        if (currentZoom >= 0) {
+                            moveCamera(location, CAMERA_ANIMATION_SHORT);
+                        } else {
+                            moveCamera(location, DEFAULT_ZOOM_FACTOR, CAMERA_ANIMATION_LONG);
+                        }
+                    } else {
+                        Toast.makeText(Map.this, R.string.gps_not_available, Toast.LENGTH_SHORT).show();
+                    }
                 }
                 break;
             default:
@@ -846,7 +879,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      */
 
     /**
-     *
      * @param documents
      */
     @Override
@@ -855,7 +887,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     }
 
     /**
-     *
      * @param document
      */
     @Override
@@ -873,7 +904,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     }
 
     /**
-     *
      * @param document
      */
     @Override
