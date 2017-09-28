@@ -52,6 +52,10 @@ import java.util.Set;
  *
  * TODO Please be aware of the fact that the Service can still run when onDestroy() of Activity is called
  *
+ * TODO Process coordinates to right format
+ *
+ * TODO check checksum
+ *
  */
 public class GPS implements GPSDataSender {
 
@@ -108,9 +112,14 @@ public class GPS implements GPSDataSender {
     private PollingClock pollingClock;
 
     /**
-     * This is used to store the last known location.
+     * This is used to store the last known location. In decimal format.
      */
     private LatLng lastKnownLatLng;
+
+    /**
+     * This is used to store the last parsed location. In wrong degree format.
+     */
+    public LatLng debugLastParsedLatLng;
 
     //-------------VARIABLES RELATED TO USB CONNECTION AND DATA READING-----------------------------
 
@@ -255,7 +264,7 @@ public class GPS implements GPSDataSender {
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
 
-            loggah("permissionReceiver.onReceive()",false);
+            loggah("permissionReceiver.onReceive()",true);
 
             if(ACTION_USB_PERMISSION.equals(action)) {
                 synchronized (this) {
@@ -384,20 +393,55 @@ public class GPS implements GPSDataSender {
         boolean toasted = false;
 
         double lat = 0;
+        double debugLat = 0;
         try {
-            lat = Double.parseDouble(parts[2]);
+            if(parts[2].length() != 9) throw new NumberFormatException("No Latitude.");
+
+            String latDeg = parts[2].substring(0, 2);
+            String latMin = parts[2].substring(2, 4);
+            String latSec = parts[2].substring(5, 7) + "." + parts[2].substring(7);
+
+            double lad = Double.parseDouble(latDeg);
+            double lam = Double.parseDouble(latMin);
+            double las = Double.parseDouble(latSec);
+
+            lam /= 60;
+            las /= 6000;
+
+            lat = lad + lam + las;
+
+
+
+            debugLat = Double.parseDouble(parts[2]) / 100;
         } catch (NumberFormatException e) {
             toasterMessage += "No Latitude";
             toasted = true;
         }
-        lat /= 100;
         if(parts[3].equals("S")) {
             lat *= -1;
         }
 
         double lng = 0;
+        double debugLng = 0;
         try {
-            lng = Double.parseDouble(parts[4]);
+            if(parts[4].length() != 10) throw new NumberFormatException("No Longitude.");
+
+            String longDeg = parts[4].substring(0, 3);
+            String longMin = parts[4].substring(3, 5);
+            String longSec = parts[4].substring(6, 8) + "." + parts[4].substring(8);
+
+            double lod = Double.parseDouble(longDeg);
+            double lom = Double.parseDouble(longMin);
+            double los = Double.parseDouble(longSec);
+
+            lom /= 60;
+            los /= 6000;
+
+            lng = lod + lom + los;
+
+
+
+            debugLng = Double.parseDouble(parts[4]) / 100;
         } catch (NumberFormatException e) {
             if(toasted) {
                 toasterMessage += " nor Longitude";
@@ -406,7 +450,6 @@ public class GPS implements GPSDataSender {
             }
             toasted = true;
         }
-        lng /= 100;
         if(parts[5].equals("W")) {
             lat *= -1;
         }
@@ -417,6 +460,7 @@ public class GPS implements GPSDataSender {
             return null;
         }
         LatLng retVal = new LatLng(lat, lng);
+        this.debugLastParsedLatLng = new LatLng(debugLat, debugLng);
         try {
             double alt = Double.parseDouble(parts[1]);
             //TODO don't set wrong altitude, dude
@@ -841,20 +885,24 @@ public class GPS implements GPSDataSender {
         //TODO reduce the synchronized keyword overall because it's rather error-prone
         //we could do this with an ArrayList, but we can only use it once anyways
         this.gpsDataReceiver.onUSBGPSLocationChanged(getLastKnownLatLng());
+        if(debugLastParsedLatLng != null) {
+            Toast.makeText(context, "" + debugLastParsedLatLng.getLatitude() + ", " + debugLastParsedLatLng.getLongitude(), Toast.LENGTH_SHORT).show();
+        } else {
+            Toast.makeText(context, "null", Toast.LENGTH_SHORT).show();
+        }
     }
 
     @Override
     public boolean startPolling() {
         //TODO human-generated method stub
         isPollerSet = true;
-
-        if(this.pollingInterval > 9999) {
-            this.pollingClock = new PollingClock(this.pollingInterval);
-        } else {
-            this.pollingClock = new PollingClock(10000);
-            Log.i(LCDT, "Polling interval set to 10 seconds.");
-        }
         if(hasEndpoint) {
+            if(this.pollingInterval > 9999) {
+                this.pollingClock = new PollingClock(this.pollingInterval);
+            } else {
+                this.pollingClock = new PollingClock(10000);
+                Log.i(LCDT, "Polling interval set to 10 seconds.");
+            }
             /*
             Thread pollingClockThread = new Thread() {
                 public void run() {
