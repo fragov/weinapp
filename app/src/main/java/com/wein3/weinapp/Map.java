@@ -38,6 +38,7 @@ import android.view.View;
 import android.widget.EditText;
 import android.widget.Toast;
 
+import com.couchbase.lite.Document;
 import com.mapbox.mapboxsdk.Mapbox;
 import com.mapbox.mapboxsdk.annotations.PolygonOptions;
 import com.mapbox.mapboxsdk.annotations.Polyline;
@@ -54,17 +55,19 @@ import com.mapbox.services.commons.geojson.Feature;
 import com.mapbox.services.commons.geojson.FeatureCollection;
 import com.mapbox.services.commons.geojson.Polygon;
 import com.mapbox.services.commons.models.Position;
-import com.wein3.weinapp.database.Database;
+import com.wein3.weinapp.database.CouchDB;
+import com.wein3.weinapp.database.DatabaseObserver;
 import com.wein3.weinapp.database.HelperDatabase;
-import com.wein3.weinapp.database.Sqlite;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 /**
  * Main activity containing the map.
  */
-public class Map extends AppCompatActivity implements View.OnClickListener, NavigationView.OnNavigationItemSelectedListener, MapboxMap.OnCameraIdleListener {
+public class Map extends AppCompatActivity implements View.OnClickListener,
+        NavigationView.OnNavigationItemSelectedListener, DatabaseObserver, MapboxMap.OnCameraIdleListener {
 
     /**
      * Default zoom factor.
@@ -106,6 +109,8 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      */
     private final String KEY_SHARED_PREFERENCES_MAP = "shared_preferences_map";
 
+    private final String TAG = "MapActivity";
+
     /**
      * Boolean flag indicating whether or not GPS tracking of one's current path is enabled.
      */
@@ -125,7 +130,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     /**
      * Database handler to store polygons.
      */
-    private Database mainDatabase;
+    private CouchDB mainDatabase;
 
     /**
      * Database handler to temporarily store the current path.
@@ -189,8 +194,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     private Intent trackingServiceIntent;
 
 
-    private String description;
-    private Area newArea;
+    private List<Document> documents;
 
     /**
      * Overridden methods of Activity class.
@@ -215,8 +219,8 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         loadStatus();
 
         // create or open main database
-        mainDatabase = new Sqlite();
-        mainDatabase.init(getApplication());
+        mainDatabase = CouchDB.getInstance(getApplication());
+        mainDatabase.registerObserver(this);
 
         // create or open helper database
         helperDatabase = new HelperDatabase();
@@ -317,15 +321,18 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                     // dialog asking to enable GPS signal
                     showGPSDisabledDialog();
                 }
-                for (String id : mainDatabase.getListOfAreas().keySet()) {
-                    Area area = mainDatabase.getAreaById(id);
-                    try {
-                        GeoJsonSource geoJsonSource = new GeoJsonSource(area.getId(), area.getFeatureCollection());
-                        mapboxMap.addSource(geoJsonSource);
-                        LineLayer lineLayer = new LineLayer(area.getId(), area.getId());
-                        mapboxMap.addLayer(lineLayer);
-                    } catch (Exception e) {
-                        Log.d("DATABASE", e.toString());
+
+                if (documents != null) {
+                    for (Document document: documents) {
+                        try {
+                            GeoJsonSource geoJsonSource = new GeoJsonSource(document.getId(),
+                                    document.getProperty("featureCollection").toString());
+                            mapboxMap.addSource(geoJsonSource);
+                            LineLayer lineLayer = new LineLayer(document.getId(), document.getId());
+                            mapboxMap.addLayer(lineLayer);
+                        } catch (Exception e) {
+                            Log.d(TAG, "Cannot add polygons from Database to Map", e);
+                        }
                     }
                 }
             }
@@ -390,7 +397,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         super.onDestroy();
         mapView.onDestroy();
         if (!pathTrackingEnabled) {
-            mainDatabase.close();
             helperDatabase.close();
         }
         saveStatus();
@@ -633,7 +639,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         // cleanup of helper database
         helperDatabase.clearTable();
         // save the polyline in main database
-        newArea = new Area();
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle(R.string.save_polygon_dialog_enter_description);
         final EditText input = new EditText(this);
@@ -642,8 +647,8 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         builder.setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
-                description = input.getText().toString();
-                newArea.setDescription(description);
+                HashMap<String, Object> documentContent = new HashMap<>();
+                documentContent.put("description", input.getText().toString());
                 List<List<Position>> positions = new ArrayList<>();
                 positions.add(new ArrayList<Position>());
                 PolygonOptions polygonOptions = new PolygonOptions();
@@ -655,8 +660,8 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                 List<Feature> features = new ArrayList<>();
                 features.add(Feature.fromGeometry(Polygon.fromCoordinates(positions)));
                 FeatureCollection featureCollection = FeatureCollection.fromFeatures(features);
-                newArea.setFeatureCollection(featureCollection.toJson());
-                mainDatabase.insertArea(newArea);
+                documentContent.put("featureCollection", featureCollection.toJson());
+                mainDatabase.insert(documentContent);
                 mapboxMap.addPolygon(polygonOptions);
                 mapboxMap.removePolyline(polylineOptions.getPolyline());
             }
@@ -849,6 +854,23 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      * Custom BroadcastReceiver.
      * =========================
      */
+
+    @Override
+    public void onRegister(List<Document> documents) {
+        this.documents = documents;
+    }
+
+    @Override
+    public void onDocumentAdded(Document document) {
+        this.documents.remove(document);
+        //ToDO: Remove object from map
+    }
+
+    @Override
+    public void onDocumentRemoved(Document document) {
+        this.documents.add(document);
+        //ToDo: Add object to map
+    }
 
     /**
      * Custom BroadcastReceiver to handle location updates from GPS tracking service.
