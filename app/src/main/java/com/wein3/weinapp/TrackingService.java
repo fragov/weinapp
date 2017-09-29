@@ -21,9 +21,25 @@ import com.wein3.weinapp.database.HelperDatabase;
  */
 public class TrackingService extends Service {
 
+    /**
+     * Manager to handle built-in GPS provider.
+     */
     private LocationManager locationManager;
+
+    /**
+     * Custom LocationListener to manage location updates from built-in GPS provider.
+     */
     private TrackingLocationListener locationListener;
+
+    /**
+     * Manager to handle external GPS provider.
+     */
     private GPS gps;
+
+    /**
+     * Custom LocationListener to manage location updates from external GPS provider.
+     */
+    private TrackingGpsDataReceiver trackingGpsDataReceiver;
 
     /**
      * Flag if external GPS device should be used.
@@ -58,7 +74,10 @@ public class TrackingService extends Service {
      */
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        // check if intent contains the external GPS device flag
+        // It may be that the service is re-created from the system. In this case,
+        // the intent is null. It may also be, that the servive is started without
+        // specifying the external GPS flag. Check for all this issues and set
+        // default values where necessary.
         if (intent != null) {
             Bundle bundle = intent.getExtras();
             if (bundle != null) {
@@ -80,7 +99,7 @@ public class TrackingService extends Service {
         }
         if (useExternalGpsDevice >= 1) {
             // enable GPS tracking from external GPS provider
-            TrackingGpsDataReceiver trackingGpsDataReceiver = new TrackingGpsDataReceiver();
+            trackingGpsDataReceiver = new TrackingGpsDataReceiver();
             gps = GPS.getInstance(getApplicationContext());
             gps.registerReceiver(trackingGpsDataReceiver);
             gps.startPolling();
@@ -110,11 +129,12 @@ public class TrackingService extends Service {
     public void onDestroy() {
         super.onDestroy();
         if (useExternalGpsDevice >= 1) {
-            // destroy LocationManager for external GPS provider
+            // destroy LocationManager and its listener for external GPS provider
             gps.stopPolling();
             gps = null;
+            trackingGpsDataReceiver = null;
         } else {
-            // destroy LocationManager for built-in GPS provider
+            // destroy LocationManager and its listener for built-in GPS provider
             locationManager.removeUpdates(locationListener);
             locationManager = null;
         }
