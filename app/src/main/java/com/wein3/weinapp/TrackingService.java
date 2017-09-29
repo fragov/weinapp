@@ -53,7 +53,21 @@ public class TrackingService extends Service {
      */
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        useExternalGpsDevice = intent.getExtras().getBoolean(Variables.KEY_USE_EXTERNAL_GPS_DEVICE, false);
+        // check if intent contains the external GPS device flag
+        if (intent != null) {
+            Bundle bundle = intent.getExtras();
+            if (bundle != null) {
+                if (bundle.containsKey(Variables.KEY_USE_EXTERNAL_GPS_DEVICE)) {
+                    useExternalGpsDevice = bundle.getBoolean(Variables.KEY_USE_EXTERNAL_GPS_DEVICE);
+                } else {
+                    useExternalGpsDevice = false;
+                }
+            } else {
+                useExternalGpsDevice = false;
+            }
+        } else {
+            useExternalGpsDevice = false;
+        }
         if (useExternalGpsDevice) {
             // enable GPS tracking from external GPS provider
             TrackingGpsDataReceiver trackingGpsDataReceiver = new TrackingGpsDataReceiver();

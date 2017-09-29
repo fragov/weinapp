@@ -940,7 +940,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                 if (currentPosition == null) {
                     // no recently saved position available, therefore
                     // add current location as first point to the polyline
-                    polylineOptions = new PolylineOptions();
                     polylineOptions.add(position);
                     updatePolyline(polylineOptions);
                 } else {
