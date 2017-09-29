@@ -28,6 +28,8 @@
 
         </android.support.design.widget.AppBarLayout>
 
+
+
     </android.support.design.widget.CollapsingToolbarLayout>
 
     <android.support.design.widget.FloatingActionButton
@@ -48,6 +50,15 @@
         android:layout_margin="@dimen/fab_margin"
         app:backgroundTint="@android:color/white"
         app:fabSize="auto" />
+
+    <ProgressBar
+        android:id="@+id/progressBar"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_marginBottom="17dp"
+        android:layout_marginRight="74dp" />
+
 
 
 </android.support.design.widget.CoordinatorLayout>
