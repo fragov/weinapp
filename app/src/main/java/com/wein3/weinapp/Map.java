@@ -125,7 +125,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     /**
      * Key to store region name.
      */
-    private final String KEY_FIELD_REGION_NAME = "field_region_name";
+    private final String KEY_FIELD_REGION_NAME = "FIELD_REGION_NAME";
 
     /**
      * Key for Map activity's SharedPreferences.
@@ -743,9 +743,47 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      * ====================================================================
      */
 
+    private void downloadRegionDialog() {
+        // Set up download interaction. Display a dialog
+        // when the user clicks download button and require
+        // a user-provided region name
+        AlertDialog.Builder builder = new AlertDialog.Builder(Map.this);
+
+        final EditText regionNameEdit = new EditText(Map.this);
+        regionNameEdit.setHint(R.string.region_input);
+        // Build the dialog box
+        builder.setTitle(R.string.new_region_input)
+                .setView(regionNameEdit)
+                .setMessage(R.string.input_dialog_message)
+                .setPositiveButton(R.string.save, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        String regionName = regionNameEdit.getText().toString();
+                        // Require a region name to begin the download.
+                        // If the user-provided string is empty, display
+                        // a toast message and do not begin download.
+                        if (regionName.length() == 0) {
+                            Toast.makeText(Map.this, R.string.region_name_input, Toast.LENGTH_SHORT).show();
+                            downloadRegionDialog();
+                        } else {
+                            // Begin download process
+                            downloadRegion(regionName);
+                        }
+                    }
+                })
+                .setNegativeButton(R.string.abort, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.cancel();
+                    }
+                });
+
+        // Display the dialog
+        builder.show();
+    }
+
     /**
-     * Downloads a region (with the given name) on which the screen is currently placed.
-     *
+     * Downloads a region (with the given Name) on which the screen is currently placed
      * @param regionName
      */
     public void downloadRegion(final String regionName) {
@@ -817,49 +855,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     }
 
     /**
-     * Show dialog to download a region.
-     */
-    private void downloadRegionDialog() {
-        // Set up download interaction. Display a dialog
-        // when the user clicks download button and require
-        // a user-provided region name
-        AlertDialog.Builder builder = new AlertDialog.Builder(Map.this);
-
-        final EditText regionNameEdit = new EditText(Map.this);
-        regionNameEdit.setHint(R.string.region_input);
-        // Build the dialog box
-        builder.setTitle(R.string.new_region_input)
-                .setView(regionNameEdit)
-                .setMessage(R.string.input_dialog_message)
-                .setPositiveButton(R.string.save, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        String regionName = regionNameEdit.getText().toString();
-                        // Require a region name to begin the download.
-                        // If the user-provided string is empty, display
-                        // a toast message and do not begin download.
-                        if (regionName.length() == 0) {
-                            Toast.makeText(Map.this, R.string.region_name_input, Toast.LENGTH_SHORT).show();
-                            downloadRegionDialog();
-                        } else {
-                            // Begin download process
-                            downloadRegion(regionName);
-                        }
-                    }
-                })
-                .setNegativeButton(R.string.abort, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        dialog.cancel();
-                    }
-                });
-
-        // Display the dialog
-        builder.show();
-    }
-
-    /**
-     * Show dialog listing all saved regions.
+     * Shows a dialog with all saved lists
      */
     private void listRegions() {
         // Build a region list when the user clicks the list button
@@ -874,7 +870,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                 // Check result. If no regions have been
                 // downloaded yet, notify user and return
                 if (offlineRegions == null || offlineRegions.length == 0) {
-                    Toast.makeText(getApplicationContext(), getString(R.string.toast_no_regions_yet), Toast.LENGTH_SHORT).show();
+                    downloadRegionDialog();
                     return;
                 }
 
@@ -955,8 +951,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     }
 
     /**
-     * Get region name from a given offlineRegion.
-     *
+     * Gets a Name of Region from a given offlineRegion
      * @param offlineRegion
      * @return
      */
@@ -1194,6 +1189,8 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      * Custom BroadcastReceiver.
      * =========================
      */
+
+
 
     /**
      * Custom BroadcastReceiver to handle location updates from GPS tracking service.
