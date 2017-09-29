@@ -11,9 +11,6 @@
         <item
             android:id="@+id/Action3"
             android:title="Offline" />
-        <item
-            android:id="@+id/Action4"
-            android:title="Action 4" />
     </group>
 
     <item android:title="Communicate">
