@@ -24,7 +24,12 @@ public class TrackingService extends Service {
     private LocationManager locationManager;
     private TrackingLocationListener locationListener;
     private GPS gps;
-    private boolean useExternalGpsDevice;
+
+    /**
+     * Flag if external GPS device should be used.
+     * Negative values indicate to use a default, 0 stands for false and 1 for true.
+     */
+    private int useExternalGpsDevice = -1;
 
     /**
      * Return the communication channel to the service.
@@ -58,17 +63,22 @@ public class TrackingService extends Service {
             Bundle bundle = intent.getExtras();
             if (bundle != null) {
                 if (bundle.containsKey(Variables.KEY_USE_EXTERNAL_GPS_DEVICE)) {
-                    useExternalGpsDevice = bundle.getBoolean(Variables.KEY_USE_EXTERNAL_GPS_DEVICE);
+                    boolean externalDevice = bundle.getBoolean(Variables.KEY_USE_EXTERNAL_GPS_DEVICE);
+                    if (externalDevice) {
+                        useExternalGpsDevice = 1;
+                    } else {
+                        useExternalGpsDevice = 0;
+                    }
                 } else {
-                    useExternalGpsDevice = false;
+                    useExternalGpsDevice = 0;
                 }
             } else {
-                useExternalGpsDevice = false;
+                if (useExternalGpsDevice < 0) {
+                    useExternalGpsDevice = 0;
+                }
             }
-        } else {
-            useExternalGpsDevice = false;
         }
-        if (useExternalGpsDevice) {
+        if (useExternalGpsDevice >= 1) {
             // enable GPS tracking from external GPS provider
             TrackingGpsDataReceiver trackingGpsDataReceiver = new TrackingGpsDataReceiver();
             gps = GPS.getInstance(getApplicationContext());
@@ -99,7 +109,7 @@ public class TrackingService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        if (useExternalGpsDevice) {
+        if (useExternalGpsDevice >= 1) {
             // destroy LocationManager for external GPS provider
             gps.stopPolling();
             gps = null;
