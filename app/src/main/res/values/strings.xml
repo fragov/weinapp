@@ -5,6 +5,7 @@
     <string name="navigation_drawer_open">Open navigation drawer</string>
     <string name="navigation_drawer_close">Close navigation drawer</string>
     <string name="toast_no_regions_yet">Es gibt noch keine heruntergeladenen Regionen</string>
+    <string name="region_name">Es gibt noch keine heruntergeladenen Regionen</string>
     <string name="toast_region_deleted">Region gelöscht</string>
     <string name="toast_region_download_success">Region erfolgreich runtergeladen!</string>
     <string name="offlineregions">Offlineregionen</string>
@@ -23,7 +24,7 @@
 
 
     <!-- General button labels -->
-    <string name="OK">OK</string>
+    <string name="ok">Ok</string>
     <string name="cancel">Schließen</string>
 
     <!-- GPS warnings -->
@@ -44,4 +45,5 @@
 
     <!-- TODO: Remove or change this placeholder text -->
     <string name="hello_blank_fragment">Hello blank fragment</string>
+    <string name="select_layer_type">Select Layer Type</string>
 </resources>

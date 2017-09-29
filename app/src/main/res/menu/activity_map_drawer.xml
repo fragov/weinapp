@@ -10,7 +10,10 @@
             android:title="Data" />
         <item
             android:id="@+id/Action3"
-            android:title="Offline" />
+            android:title="Neue Offlineregion" />
+        <item
+            android:id="@+id/Action4"
+            android:title="Offlineregionen" />
     </group>
 
     <item android:title="Communicate">

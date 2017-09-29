@@ -35,6 +35,7 @@ import android.view.Display;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.ProgressBar;
 import android.widget.Toast;
@@ -46,6 +47,7 @@ import com.mapbox.mapboxsdk.annotations.Polyline;
 import com.mapbox.mapboxsdk.annotations.PolylineOptions;
 import com.mapbox.mapboxsdk.camera.CameraPosition;
 import com.mapbox.mapboxsdk.camera.CameraUpdateFactory;
+import com.mapbox.mapboxsdk.constants.Style;
 import com.mapbox.mapboxsdk.geometry.LatLng;
 import com.mapbox.mapboxsdk.geometry.LatLngBounds;
 import com.mapbox.mapboxsdk.maps.MapView;
@@ -56,8 +58,6 @@ import com.mapbox.mapboxsdk.offline.OfflineRegion;
 import com.mapbox.mapboxsdk.offline.OfflineRegionError;
 import com.mapbox.mapboxsdk.offline.OfflineRegionStatus;
 import com.mapbox.mapboxsdk.offline.OfflineTilePyramidRegionDefinition;
-import com.mapbox.mapboxsdk.style.layers.LineLayer;
-import com.mapbox.mapboxsdk.style.sources.GeoJsonSource;
 import com.mapbox.services.commons.geojson.Feature;
 import com.mapbox.services.commons.geojson.FeatureCollection;
 import com.mapbox.services.commons.geojson.Polygon;
@@ -66,6 +66,8 @@ import com.wein3.weinapp.database.CouchDB;
 import com.wein3.weinapp.database.DatabaseObserver;
 import com.wein3.weinapp.database.HelperDatabase;
 
+import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
@@ -75,7 +77,9 @@ import java.util.List;
 /**
  * Main activity containing map and basic user interface.
  */
-public class Map extends AppCompatActivity implements View.OnClickListener, NavigationView.OnNavigationItemSelectedListener, MapboxMap.OnCameraMoveListener, DatabaseObserver {
+public class Map extends AppCompatActivity implements View.OnClickListener,
+        NavigationView.OnNavigationItemSelectedListener, MapboxMap.OnCameraMoveListener,
+        DatabaseObserver {
 
     /**
      * Debug tag for logging.
@@ -103,9 +107,10 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     private final int CAMERA_ANIMATION_SHORT = 1000;
 
     /**
-     * Request code for intent to location source settings activity in order to enable GPS signal.
+     * Request codes for intents.
      */
     private final int REQUEST_CODE_LOCATION_SOURCE_SETTINGS = 0;
+    private final int DB_CONTENT_RESULT_CODE = 1;
 
     /**
      * Key for NotificationManager.
@@ -205,6 +210,11 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     private TrackingBroadcastReceiver trackingBroadcastReceiver;
 
     /**
+     * FloatingActionButton to select layers
+     */
+    private FloatingActionButton fabLayers;
+
+    /**
      * FloatingActionButton to move the camera to the current location.
      */
     private FloatingActionButton fabLocation;
@@ -228,6 +238,11 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      *
      */
     private ProgressBar progressBar;
+
+    /**
+     *
+     */
+    private HashMap<String, com.mapbox.mapboxsdk.annotations.Polygon> polygons;
 
     /**
      * Overridden methods of Activity class.
@@ -259,6 +274,8 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         mainDatabase = CouchDB.getInstance(getApplication());
         mainDatabase.registerObserver(this);
 
+        polygons = new HashMap<>();
+
         // create or open helper database
         HelperDatabase.openDatabase(getApplication());
 
@@ -279,7 +296,10 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         fabLocation.setOnClickListener(this);
         fabLocation.setImageResource(R.drawable.ic_gps);
 
-        // set progress bar to show the progress when downloading an offline map
+        fabLayers = (FloatingActionButton) findViewById(R.id.fabLayers);
+        fabLayers.setOnClickListener(this);
+        fabLayers.setImageResource(R.drawable.ic_layers);
+
         progressBar = (ProgressBar) findViewById(R.id.progressBar);
         progressBar.setVisibility(View.INVISIBLE);
 
@@ -335,7 +355,8 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                 display.getMetrics(outMetrics);
                 float density = getResources().getDisplayMetrics().density;
                 int displayHeight = (int) (outMetrics.heightPixels / density);
-                int compassShift = 80;
+                int compassShift = 110;
+
                 mapboxMap.getUiSettings().setCompassMargins(
                         mapboxMap.getUiSettings().getCompassMarginLeft(),
                         compassShift,
@@ -370,15 +391,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                 // read all saved polygons from the database
                 if (documents != null) {
                     for (Document document : documents) {
-                        try {
-                            GeoJsonSource geoJsonSource = new GeoJsonSource(document.getId(),
-                                    document.getProperty("geometry").toString());
-                            mapboxMap.addSource(geoJsonSource);
-                            LineLayer lineLayer = new LineLayer(document.getId(), document.getId());
-                            mapboxMap.addLayer(lineLayer);
-                        } catch (Exception e) {
-                            Log.d(DEBUG_TAG, "Cannot add polygons from Database to Map", e);
-                        }
+                        addDocumentAsPolygonToMap(document);
                     }
                 }
             }
@@ -489,31 +502,22 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-
-        // Check for the request code regardless of the result code. In Android 4.3
-        // the GPS settings menu can only be exited by cancelling it. Maybe in other
-        // versions it is different.
-
-        if (resultCode == RESULT_CANCELED) {
-            // invoked activity was cancelled without returning a result
-            switch (requestCode) {
-                case REQUEST_CODE_LOCATION_SOURCE_SETTINGS:
-                    Location location = mapboxMap.getMyLocation();
-                    moveCamera(location, DEFAULT_ZOOM_FACTOR, CAMERA_ANIMATION_LONG);
-                    break;
-                default:
-                    break;
-            }
-        } else {
-            // invoked activity successfully returns a result
-            switch (requestCode) {
-                case REQUEST_CODE_LOCATION_SOURCE_SETTINGS:
-                    Location location = mapboxMap.getMyLocation();
-                    moveCamera(location, DEFAULT_ZOOM_FACTOR, CAMERA_ANIMATION_LONG);
-                    break;
-                default:
-                    break;
-            }
+        switch(requestCode) {
+            case DB_CONTENT_RESULT_CODE:
+                if (resultCode == DBContent.RESULT_OK && data != null) {
+                    moveCamera(new LatLng(data.getDoubleExtra("lat", 0.0),
+                            data.getDoubleExtra("lng", 0.0)), DEFAULT_ZOOM_FACTOR,
+                            CAMERA_ANIMATION_SHORT);
+                    //PolygonInfoListDialogFragment.newInstance(30).show(getSupportFragmentManager(), "dialog");
+                }
+                break;
+            case REQUEST_CODE_LOCATION_SOURCE_SETTINGS:
+                // Check for the request code regardless of the result code. In Android 4.3
+                // the GPS settings menu can only be exited by cancelling it. Maybe in other
+                // versions it is different.
+                Location location = mapboxMap.getMyLocation();
+                moveCamera(location, DEFAULT_ZOOM_FACTOR, CAMERA_ANIMATION_LONG);
+                break;
         }
     }
 
@@ -700,7 +704,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         final EditText input = new EditText(this);
         input.setInputType(InputType.TYPE_CLASS_TEXT);
         builder.setView(input);
-        builder.setPositiveButton(R.string.OK, new DialogInterface.OnClickListener() {
+        builder.setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
                 HashMap<String, Object> documentContent = new HashMap<>();
@@ -718,7 +722,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                 FeatureCollection featureCollection = FeatureCollection.fromFeatures(features);
                 documentContent.put("geometry", featureCollection.toJson());
                 mainDatabase.insert(documentContent);
-                mapboxMap.addPolygon(polygonOptions);
+                //mapboxMap.addPolygon(polygonOptions);
                 mapboxMap.removePolyline(polylineOptions.getPolyline());
             }
         });
@@ -891,7 +895,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                                 regionSelected = which;
                             }
                         })
-                        .setPositiveButton(R.string.OK, new DialogInterface.OnClickListener() {
+                        .setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int id) {
                                 // Get the region bounds and zoom
@@ -1062,6 +1066,58 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     @Override
     public void onClick(View v) {
         switch (v.getId()) {
+            case R.id.fabLayers:
+                AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                builder.setTitle(R.string.select_layer_type);
+                final EditText input = new EditText(this);
+                input.setInputType(InputType.TYPE_CLASS_TEXT);
+                builder.setView(input);
+                final ArrayAdapter<String> arrayAdapter = new ArrayAdapter<String>(Map.this,
+                        android.R.layout.select_dialog_item);
+                arrayAdapter.add("Streets");
+                arrayAdapter.add("Outdoors");
+                arrayAdapter.add("Light");
+                arrayAdapter.add("Dark");
+                arrayAdapter.add("Satellite");
+                arrayAdapter.add("Satellite w/ Streets");
+
+                builder.setNegativeButton("cancel", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.dismiss();
+                    }
+                });
+
+                builder.setAdapter(arrayAdapter, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        switch (which) {
+                            case 0:
+                                mapboxMap.setStyle(Style.MAPBOX_STREETS);
+                                break;
+                            case 1:
+                                mapboxMap.setStyle(Style.OUTDOORS);
+                                break;
+                            case 2:
+                                mapboxMap.setStyle(Style.LIGHT);
+                                break;
+                            case 3:
+                                mapboxMap.setStyle(Style.DARK);
+                                break;
+                            case 4:
+                                mapboxMap.setStyle(Style.SATELLITE);
+                                break;
+                            case 5:
+                                mapboxMap.setStyle(Style.SATELLITE_STREETS);
+                                break;
+                        }
+
+                    }
+                });
+
+
+                builder.show();
+                break;
             case R.id.fabPath:
                 if (useExternalGpsDevice) {
                     if (pathTrackingEnabled) {
@@ -1119,7 +1175,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                 startActivity(new Intent(Map.this, GPSTester.class));
                 break;
             case R.id.Action2:
-                startActivity(new Intent(Map.this, DBContent.class));
+                startActivityForResult(new Intent(Map.this, DBContent.class), DB_CONTENT_RESULT_CODE);
                 break;
             case R.id.Action3:
                 listRegions();
@@ -1165,15 +1221,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     @Override
     public void onDocumentAdded(Document document) {
         this.documents.add(document);
-        try {
-            GeoJsonSource geoJsonSource = new GeoJsonSource(document.getId(),
-                    document.getProperty("geometry").toString());
-            mapboxMap.addSource(geoJsonSource);
-            LineLayer lineLayer = new LineLayer(document.getId(), document.getId());
-            mapboxMap.addLayer(lineLayer);
-        } catch (Exception e) {
-            Log.d(DEBUG_TAG, "Cannot add polygons from Database to Map", e);
-        }
+        addDocumentAsPolygonToMap(document);
     }
 
     /**
@@ -1182,7 +1230,48 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     @Override
     public void onDocumentRemoved(Document document) {
         this.documents.remove(document);
-        mapboxMap.removeLayer(document.getId());
+        mapboxMap.removePolygon(polygons.get(document.getId()));
+        polygons.remove(document.getId());
+    }
+
+    private void addDocumentAsPolygonToMap(Document document) {
+        Object geometry = document.getProperty("geometry");
+        if (geometry != null) {
+            try {
+                JSONObject featureCollection = new JSONObject(geometry.toString());
+                JSONArray features = featureCollection.getJSONArray("features");
+                for(int f = 0; f < features.length(); f++) {
+                    JSONObject featureObject = features.getJSONObject(f);
+
+                    Feature feature = Feature.fromJson(featureObject.toString());
+                    if (feature.getGeometry() instanceof Polygon) {
+
+                        List<LatLng> list = new ArrayList<>();
+                        for (int i = 0; i < ((Polygon) feature.getGeometry()).getCoordinates()
+                                .size(); i++) {
+                            for (int j = 0;
+                                 j < ((Polygon) feature.getGeometry()).getCoordinates().get(i)
+                                         .size(); j++) {
+                                list.add(new LatLng(
+                                        ((Polygon) feature.getGeometry()).getCoordinates().get(i)
+                                                .get(j).getLatitude(),
+                                        ((Polygon) feature.getGeometry()).getCoordinates().get(i)
+                                                .get(j).getLongitude()
+                                ));
+                            }
+                        }
+
+                        polygons.put(document.getId(), mapboxMap.addPolygon(new PolygonOptions()
+                                .addAll(list)
+                                .fillColor(Color.parseColor("#8A8ACB"))
+                                .alpha(0.3f)
+                        ));
+                    }
+                }
+            } catch (JSONException e) {
+                Log.e(DEBUG_TAG, "Can not create Feature from JSON", e);
+            }
+        }
     }
 
     /**
