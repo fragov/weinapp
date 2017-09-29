@@ -16,8 +16,19 @@ import java.util.List;
  */
 public class HelperDatabase {
 
+    /**
+     * Current SQLiteDatabase instance.
+     */
     private static SQLiteDatabase sqLiteDatabase;
+
+    /**
+     * Database file name.
+     */
     private static final String DATABASE_FILE = "helper_database.db";
+
+    /**
+     * Table name.
+     */
     private static final String CURRENT_PATH_TABLE = "current_path";
 
     /**
