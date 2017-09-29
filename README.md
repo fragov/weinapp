@@ -1,4 +1,5 @@
-TrackingService:
+TrackingService
+
 Der Trackingservice wird dann gestartet, wenn der Benutzer auf den "Record" button klickt. Dieser heißt intern "fabPath" genannt und wird in der OnClick methode in der Map Klasse aufgerufen. Der Service läuft die ganze Zeit im Hintergrund und er hat eine innere Klasse, die die ganze Zeit auf GPS daten hört. Jedes mal, wenn eine neue Koordinate reinkommt, wird diese an die Map Klasse über einen Broadcast geschickt. In der Map wird jedes mal eine Koordinate abgefangen und zur Polylineoptions hinzugefügt. Aus diesen Options wird dann die gelaufene Strecke gezeichnet.
 Durch den Trackingservice wird garantiert, dass die App, auch wenn sie minimiert wird (wenn z.B. ein Anruf kommmt oder man eine andere Anwendung startet), weiter den Weg mitverfolgt. Wenn der Service keine Koordinaten an die Map Activity senden kann, weil diese z.B. auf Grund des mangelnden Arbeitsspeichers zerstört wurde, schreibt er die Koordinaten in die interne Datenbank. Wenn die Map Activity gestartet wird, liest sie alle Koordinaten aus der Selben Datenbank aus und man hat trotzdem den gesamten Weg aufgezeichnet.
 Beim erneuten Klicken auf den selben Button wird der Trackingservice beendet und man kann dann entweder die Strecke als ein Polygon in die Datenbank speichern oder den gelaufenen Weg stornieren.
@@ -12,8 +13,9 @@ Gerät von Navilock) verarbeitet. Beim Starten des Services wird dem Intent
 eine Boolean-Flag mitgegeben, ob der externe GPS-Provider verwendet werden
 soll oder nicht.
 
-OfflineMaps:
+Offline Maps
 
+Beim Klicken auf den Menupunkt "Offline" bekommt der Benutzer eine Liste mit gespeicherten Offlineregionen angezeigt. Er kann eins davon auswählen und die Kamera zu diesem Standort verschieben, Region löschen oder eine weitere Region erstellen. Wenn es noch keine gespeicherten Regionen gibt, wird dem Benutzer vorgeschlagen eine neue Region zu erstellen. Um eine neue Offlineregion zu erstellen, werden einfach die Eckpunkte des Bildschirmes ausgelesen und die Region wird mit dem eingegebenen Namen und diesen Eckpunkten in der downloadRegion(String) Methode runtergeladen. Die von Mapbox gelieferten Methoden erlauben es uns den Downloadprozess asynchron zu machen, d.h. man ist weiterhin dazu in der Lage die Karte zu benutzen und sogar den Weg weiterhin zu verfolgen. Die Offlinekarten werden auch automatisch in die interne Datenbank gespeichert. Das Löschen ist ebenfalls mit den gelieferten Methoden von Mapbox realisiert. 
 
 HelperDatabase
 
