@@ -771,7 +771,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                         }
                     }
                 })
-                .setNegativeButton(R.string.abort, new DialogInterface.OnClickListener() {
+                .setNegativeButton(R.string.choose_new_region, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
                         dialog.cancel();
