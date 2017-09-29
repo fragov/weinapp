@@ -46,7 +46,6 @@ import com.mapbox.mapboxsdk.annotations.Polyline;
 import com.mapbox.mapboxsdk.annotations.PolylineOptions;
 import com.mapbox.mapboxsdk.camera.CameraPosition;
 import com.mapbox.mapboxsdk.camera.CameraUpdateFactory;
-import com.mapbox.mapboxsdk.constants.Style;
 import com.mapbox.mapboxsdk.geometry.LatLng;
 import com.mapbox.mapboxsdk.geometry.LatLngBounds;
 import com.mapbox.mapboxsdk.maps.MapView;
@@ -69,32 +68,28 @@ import com.wein3.weinapp.database.HelperDatabase;
 
 import org.json.JSONObject;
 
-import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
 /**
- * Main activity containing the map.
+ * Main activity containing map and basic user interface.
  */
-public class Map extends AppCompatActivity implements View.OnClickListener, NavigationView.OnNavigationItemSelectedListener, MapboxMap.OnCameraIdleListener, DatabaseObserver {
-
-    /**
-     * Debug tag for logging.
-     */
-    private final String DEBUG_TAG = this.getClass().getSimpleName();
-
-    /**
-     * Default zoom factor.
-     */
-    private final double DEFAULT_ZOOM_FACTOR = 16;
+public class Map extends AppCompatActivity implements View.OnClickListener, NavigationView.OnNavigationItemSelectedListener, MapboxMap.OnCameraMoveListener, DatabaseObserver {
 
     /**
      * JSON encoding/decoding
      */
     public static final String JSON_CHARSET = "UTF-8";
     public static final String JSON_FIELD_REGION_NAME = "FIELD_REGION_NAME";
-
+    /**
+     * Debug tag for logging.
+     */
+    private final String DEBUG_TAG = this.getClass().getSimpleName();
+    /**
+     * Default zoom factor.
+     */
+    private final double DEFAULT_ZOOM_FACTOR = 16;
     /**
      * Default camera animation length (long).
      */
@@ -134,92 +129,74 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      * Key for Map activity's SharedPreferences.
      */
     private final String KEY_SHARED_PREFERENCES_MAP = "shared_preferences_map";
-
+    //private Area newArea;
+    OfflineManager offlineManager;
+    LatLngBounds latLngBounds;
     /**
      * Boolean flag indicating whether or not GPS tracking of one's current path is enabled.
      */
     private boolean pathTrackingEnabled;
-
     /**
      * Boolean flag indicating whether or not an external GPS provider should be used.
      */
-    private boolean useExternalGpsDevice = false;
-
+    private boolean useExternalGpsDevice = true;
     /**
      * Current zoom factor of camera.
      * Negative values indicate that the zoom factor is not set.
      */
     private double currentZoom;
-
     /**
      * Database handler to store polygons.
      */
     private CouchDB mainDatabase;
-
     /**
      * MapView containing the map.
      */
     private MapView mapView;
-
     /**
      * MapboxMap instance managing the map.
      */
     private MapboxMap mapboxMap;
-
     /**
      * PolylineOptions instance representing the coordinates of the path on the map.
      */
     private PolylineOptions polylineOptions;
-
     /**
      * Polyline instance representing the actual path on the map.
      */
     private Polyline currentPolyline;
-
     /**
      * LatLng instance containing the latest position received from the TrackingService.
      */
     private LatLng currentPosition;
-
     /**
      * Global LocationManager instance.
      */
     private LocationManager locationManager;
-
     /**
      * Global NotificationManager instance.
      */
     private NotificationManager notificationManager;
-
     /**
      * Global instance of custom BroadcastReceiver to receive location updates
      * from GPS tracking service.
      */
     private TrackingBroadcastReceiver trackingBroadcastReceiver;
-
     /**
      * FloatingActionButton to move the camera to the current location.
      */
     private FloatingActionButton fabLocation;
-
     /**
      * FloatingActionButton to enable or disable path tracking.
      */
     private FloatingActionButton fabPath;
-
     /**
      * Couchbase data.
      */
     private List<Document> documents;
-
     private int regionSelected;
-
-
     private ProgressBar progressBar;
     private String description;
-    //private Area newArea;
-    OfflineManager offlineManager;
-    LatLngBounds latLngBounds;
     /**
      * Overridden methods of Activity class.
      * =====================================
@@ -312,7 +289,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                 // get MapboxMap instance
                 mapboxMap = mbMap;
                 // add camera movement listener
-                mapboxMap.setOnCameraIdleListener(Map.this);
+                mapboxMap.setOnCameraMoveListener(Map.this);
                 // add the recently saved polyline from the database
                 polylineOptions = new PolylineOptions();
                 List<LatLng> coordinates = HelperDatabase.getCurrentPath();
@@ -636,7 +613,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         SharedPreferences data = getSharedPreferences(KEY_SHARED_PREFERENCES_MAP, Context.MODE_PRIVATE);
         SharedPreferences.Editor edit = data.edit();
         edit.putBoolean(KEY_PATH_TRACKING_ENABLED, pathTrackingEnabled);
-        edit.putBoolean(KEY_USE_EXTERNAL_GPS_DEVICE, useExternalGpsDevice);
         edit.putFloat(KEY_ZOOM_FACTOR, (float) currentZoom);
         edit.commit();
     }
@@ -647,7 +623,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     private void loadStatus() {
         SharedPreferences data = getSharedPreferences(KEY_SHARED_PREFERENCES_MAP, Context.MODE_PRIVATE);
         pathTrackingEnabled = data.getBoolean(KEY_PATH_TRACKING_ENABLED, false);
-        useExternalGpsDevice = data.getBoolean(KEY_USE_EXTERNAL_GPS_DEVICE, false);
         currentZoom = (double) data.getFloat(KEY_ZOOM_FACTOR, -1);
     }
 
@@ -895,16 +870,17 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     }
 
     /**
-     * Methods provided by MapboxMap.OnCameraIdleListener interface.
-     * Store information of the camera view when camera movement has ended.
-     * ====================================================================
+     * Methods provided by MapboxMap.OnCameraMoveListener which
+     * store camera view information when the camera is moving.
+     * ========================================================
      */
 
     /**
-     * Called when camera movement has ended.
+     * Called repeatedly as the camera continues to move after an onCameraMoveStarted call.
+     * This may be called as often as once every frame and should not perform expensive operations.
      */
     @Override
-    public void onCameraIdle() {
+    public void onCameraMove() {
         currentZoom = mapboxMap.getCameraPosition().zoom;
     }
 
@@ -952,43 +928,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
      * =========================
      */
 
-    /**
-     * Custom BroadcastReceiver to handle location updates from GPS tracking service.
-     */
-    private class TrackingBroadcastReceiver extends BroadcastReceiver {
-
-        /**
-         * This method is called when the BroadcastReceiver is receiving an Intent
-         * broadcast.
-         *
-         * @param context The Context in which the receiver is running.
-         * @param intent  The Intent being received.
-         */
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            // get location data included in the Intent
-            double latitude = intent.getDoubleExtra(Variables.LATITUDE, 0);
-            double longitude = intent.getDoubleExtra(Variables.LONGITUDE, 0);
-            LatLng position = new LatLng(latitude, longitude);
-            // add the current location to the polyline only if tracking is enabled
-            if (pathTrackingEnabled) {
-                // check if the BroadcastReceiver already received a location update
-                if (currentPosition == null) {
-                    // no recently saved position available, therefore
-                    // add current location as first point to the polyline
-                    polylineOptions.add(position);
-                    updatePolyline(polylineOptions);
-                } else {
-                    // recently saved position available, therefore just add it to the polyline
-                    polylineOptions.add(position);
-                    HelperDatabase.addToCurrentPath(latitude, longitude);
-                }
-            }
-            currentPosition = position;
-        }
-    }
-
-
     private void downloadRegionDialog() {
         // Set up download interaction. Display a dialog
         // when the user clicks download button and require
@@ -1028,7 +967,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         // Display the dialog
         builder.show();
     }
-
 
     public void downloadRegion(final String regionName) {
         progressBar.setVisibility(View.VISIBLE);
@@ -1098,7 +1036,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
             }
         });
     }
-
 
     private void listRegions() {
         // Build a region list when the user clicks the list button
@@ -1207,6 +1144,42 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
             Log.e("TAG", "Failed to decode metadata: " + exception.getMessage());
         }
         return regionName;
+    }
+
+    /**
+     * Custom BroadcastReceiver to handle location updates from GPS tracking service.
+     */
+    private class TrackingBroadcastReceiver extends BroadcastReceiver {
+
+        /**
+         * This method is called when the BroadcastReceiver is receiving an Intent
+         * broadcast.
+         *
+         * @param context The Context in which the receiver is running.
+         * @param intent  The Intent being received.
+         */
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            // get location data included in the Intent
+            double latitude = intent.getDoubleExtra(Variables.LATITUDE, 0);
+            double longitude = intent.getDoubleExtra(Variables.LONGITUDE, 0);
+            LatLng position = new LatLng(latitude, longitude);
+            // add the current location to the polyline only if tracking is enabled
+            if (pathTrackingEnabled) {
+                // check if the BroadcastReceiver already received a location update
+                if (currentPosition == null) {
+                    // no recently saved position available, therefore
+                    // add current location as first point to the polyline
+                    polylineOptions.add(position);
+                    updatePolyline(polylineOptions);
+                } else {
+                    // recently saved position available, therefore just add it to the polyline
+                    polylineOptions.add(position);
+                    HelperDatabase.addToCurrentPath(latitude, longitude);
+                }
+            }
+            currentPosition = position;
+        }
     }
 
 }
