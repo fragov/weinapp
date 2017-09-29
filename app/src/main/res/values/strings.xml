@@ -5,12 +5,24 @@
     <string name="navigation_drawer_open">Open navigation drawer</string>
     <string name="navigation_drawer_close">Close navigation drawer</string>
     <string name="toast_no_regions_yet">Es gibt noch keine heruntergeladenen Regionen</string>
-    <string name="region_name">Es gibt noch keine heruntergeladenen Regionen</string>
     <string name="toast_region_deleted">Region gelöscht</string>
+    <string name="toast_region_download_success">Region erfolgreich runtergeladen!</string>
+    <string name="offlineregions">Offlineregionen</string>
+    <string name="new_region">Neue Region</string>
+    <string name="delete_region">Region löschen</string>
+    <string name="region_input">Regionnamen eingeben</string>
+    <string name="new_region_input">Neuen Regionnamen eingeben</string>
+    <string name="input_dialog_message">Bitte positionieren Sie die Kamera auf die Region auf der Karte,
+        die sie runterladen möchten. Der Downloadprozess kann mehrere Minuten in Anspruch nehmen</string>
+    <string name="save">Speichern</string>
+    <string name="abort">Abbrechen</string>
+    <string name="region_name_input">Bitte Regionname eingeben</string>
+
+
 
 
     <!-- General button labels -->
-    <string name="ok">Ok</string>
+    <string name="OK">OK</string>
     <string name="cancel">Schließen</string>
 
     <!-- GPS warnings -->

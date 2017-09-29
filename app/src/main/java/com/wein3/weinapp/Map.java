@@ -665,7 +665,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         final EditText input = new EditText(this);
         input.setInputType(InputType.TYPE_CLASS_TEXT);
         builder.setView(input);
-        builder.setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
+        builder.setPositiveButton(R.string.OK, new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
                 HashMap<String, Object> documentContent = new HashMap<>();
@@ -856,13 +856,9 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                 startActivity(new Intent(Map.this, DBContent.class));
                 break;
             case R.id.Action3:
-                downloadRegionDialog();
-                break;
-            case R.id.Action4:
                 listRegions();
                 break;
             default:
-                break;
         }
         DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
         drawer.closeDrawer(GravityCompat.START);
@@ -935,13 +931,12 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         AlertDialog.Builder builder = new AlertDialog.Builder(Map.this);
 
         final EditText regionNameEdit = new EditText(Map.this);
-        regionNameEdit.setHint("Regionnamen eingeben");
+        regionNameEdit.setHint(R.string.region_input);
         // Build the dialog box
-        builder.setTitle("Neuen Regionnamen eingeben")
+        builder.setTitle(R.string.new_region_input)
                 .setView(regionNameEdit)
-                .setMessage("Bitte positionieren Sie die Kamera auf die Region auf der Karte, die sie " +
-                        "runterladen möchten. Der Downloadprozess kann mehrere Minuten in Anspruch nehmen")
-                .setPositiveButton("Speichern", new DialogInterface.OnClickListener() {
+                .setMessage(R.string.input_dialog_message)
+                .setPositiveButton(R.string.save, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
                         String regionName = regionNameEdit.getText().toString();
@@ -949,7 +944,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                         // If the user-provided string is empty, display
                         // a toast message and do not begin download.
                         if (regionName.length() == 0) {
-                            Toast.makeText(Map.this, "Bitte Regionname eingeben", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(Map.this, R.string.region_name_input, Toast.LENGTH_SHORT).show();
                             downloadRegionDialog();
                         } else {
                             // Begin download process
@@ -957,7 +952,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                         }
                     }
                 })
-                .setNegativeButton("Abbrechen", new DialogInterface.OnClickListener() {
+                .setNegativeButton(R.string.abort, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
                         dialog.cancel();
@@ -968,6 +963,10 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         builder.show();
     }
 
+    /**
+     * Downloads a region (with the given Name) on which the screen is currently placed
+     * @param regionName
+     */
     public void downloadRegion(final String regionName) {
         progressBar.setVisibility(View.VISIBLE);
         //latLngBounds = b.build();
@@ -988,7 +987,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
             String json = jsonObject.toString();
             metadata = json.getBytes(JSON_CHARSET);
         } catch (Exception exception) {
-            Log.e("TAG", "Failed to encode metadate: " + exception.getMessage());
+            Log.e("TAG", "Failed to encode metadata: " + exception.getMessage());
             metadata = null;
         }
 
@@ -1010,8 +1009,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
 
                         if (status.isComplete()) {
                             progressBar.setVisibility(View.INVISIBLE);
-                            Log.d("SUCCES", "Region downloaded successfully.");
-                            Toast.makeText(Map.this, "Region erfolgreich runtergeladen!", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(Map.this, R.string.toast_region_download_success, Toast.LENGTH_SHORT).show();
                         } else if (status.isRequiredResourceCountPrecise()) {
                             Log.d("TAG", percentage + " ");
                         }
@@ -1037,6 +1035,9 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         });
     }
 
+    /**
+     * Shows a dialog with all saved lists
+     */
     private void listRegions() {
         // Build a region list when the user clicks the list button
 
@@ -1063,7 +1064,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
 
                 // Build a dialog containing the list of regions
                 AlertDialog dialog = new AlertDialog.Builder(Map.this)
-                        .setTitle("Offlineregionen")
+                        .setTitle(R.string.offlineregions)
                         .setSingleChoiceItems(items, 0, new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
@@ -1071,7 +1072,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                                 regionSelected = which;
                             }
                         })
-                        .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                        .setPositiveButton(R.string.OK, new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int id) {
                                 // Get the region bounds and zoom
@@ -1083,7 +1084,13 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                                 moveCamera(bounds.getCenter(), DEFAULT_ZOOM_FACTOR, CAMERA_ANIMATION_LONG);
                             }
                         })
-                        .setNeutralButton("Region löschen", new DialogInterface.OnClickListener() {
+                        .setNeutralButton(R.string.new_region, new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int id) {
+                                downloadRegionDialog();
+                            }
+                        })
+                        .setNegativeButton(R.string.delete_region, new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int id) {
                                 // Make progressBar indeterminate and
@@ -1112,13 +1119,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
                                     }
                                 });
                             }
-                        })
-                        .setNegativeButton("Abbrechen", new DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(DialogInterface dialog, int id) {
-                                // When the user cancels, don't do anything.
-                                // The dialog will automatically close
-                            }
                         }).create();
                 dialog.show();
 
@@ -1131,10 +1131,14 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
         });
     }
 
+    /**
+     * Gets a Name of Region from a given offlineRegion
+     * @param offlineRegion
+     * @return
+     */
     private String getRegionName(OfflineRegion offlineRegion) {
         // Get the region name from the offline region metadata
         String regionName = "";
-
         try {
             byte[] metadata = offlineRegion.getMetadata();
             String json = new String(metadata, JSON_CHARSET);
