@@ -441,10 +441,11 @@ public class GPS implements GPSDataSender {
             double lam = Double.parseDouble(latMin);
             double las = Double.parseDouble(latSec);
 
+            las /= 60;
+            lam += las;
             lam /= 60;
-            las /= 6000;
 
-            lat = lad + lam + las;
+            lat = lad + lam;
 
 
 
@@ -470,10 +471,11 @@ public class GPS implements GPSDataSender {
             double lom = Double.parseDouble(longMin);
             double los = Double.parseDouble(longSec);
 
+            los /= 60;
+            lom += los;
             lom /= 60;
-            los /= 6000;
 
-            lng = lod + lom + los;
+            lng = lod + lom;
 
 
 
@@ -894,17 +896,36 @@ public class GPS implements GPSDataSender {
 
     //-------------INTERFACE METHODS----------------------------------------------------------------
 
+    /**
+     * This method is used to register a GPSDataReceiver in this GPSDataSender.
+     * Currently only usable for only one GPSDataReceiver at a time.
+     *
+     * @param gpsDataReceiver - GPSDataReceiver to be registered
+     */
     @Override
     public void registerReceiver(GPSDataReceiver gpsDataReceiver) {
         //we could do this with an ArrayList, but we can only use it once
         this.gpsDataReceiver = gpsDataReceiver;
     }
 
+    /**
+     * This method is used to unregister a GPSDataReceiver in this GPSDataSender.
+     * Currently only usable for only one GPSDataReceiver at a time.
+     *
+     * @param gpsDataReceiver - GPSDataReceiver to be unregistered.
+     */
     @Override
     public void unRegisterReceiver(GPSDataReceiver gpsDataReceiver) {
         this.gpsDataReceiver = null;
     }
 
+    /**
+     * Set the interval between two attempts to read data from the USB GPS device.
+     * Please note, that this interval is currently the biggest problem.
+     * Therefore, it's not guaranteed to receive data in your specified interval.
+     *
+     * @param millis - interval time in milliseconds
+     */
     @Override
     public void setPollingInterval(long millis) {
         if(millis > 9999) {

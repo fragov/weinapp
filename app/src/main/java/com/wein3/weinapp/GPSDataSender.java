@@ -7,7 +7,6 @@ package com.wein3.weinapp;
 public interface GPSDataSender {
     /**
      * This method is used to register a GPSDataReceiver in this GPSDataSender.
-     * Currently only usable for only one GPSDataReceiver at a time.
      *
      * @param gpsDataReceiver - GPSDataReceiver to be registered
      */
@@ -15,7 +14,6 @@ public interface GPSDataSender {
 
     /**
      * This method is used to unregister a GPSDataReceiver in this GPSDataSender.
-     * Currently only usable for only one GPSDataReceiver at a time.
      *
      * @param gpsDataReceiver - GPSDataReceiver to be unregistered.
      */
@@ -23,8 +21,7 @@ public interface GPSDataSender {
 
     /**
      * Set the interval between two attempts to read data from the USB GPS device.
-     * Please note, that this interval is currently the biggest problem.
-     * Therefore, it's not guaranteed to receive data in your specified interval.
+     * It's not guaranteed to receive data in your specified interval.
      *
      * @param millis - interval time in milliseconds
      */

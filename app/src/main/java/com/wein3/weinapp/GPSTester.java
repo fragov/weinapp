@@ -14,10 +14,30 @@ import com.mapbox.mapboxsdk.geometry.LatLng;
  */
 public class GPSTester extends AppCompatActivity implements GPSDataReceiver {
 
+    /**
+     * Button to start and stop polling process.
+     */
     private Button getLatLong;
+
+    /**
+     * TextView to show latitude.
+     */
     private TextView textViewLat;
+
+    /**
+     * TextView to show longitude.
+     */
     private TextView textViewLong;
+
+    /**
+     * TextView to show time provided by sensor.
+     */
     private TextView satTime;
+
+    /**
+     * Button which is sending a Toast if pressed. Used to test if multithreading works and
+     * responsiveness is guaranteed.
+     */
     private Button multithreadToaster;
 
     private GPS gps;
@@ -62,6 +82,12 @@ public class GPSTester extends AppCompatActivity implements GPSDataReceiver {
         });
     }
 
+    /**
+     * Conveniently call the logging method from the gps.
+     *
+     * @param mess - look at gps.loggah(mess, toast)
+     * @param toast - look at gps.loggah(mess, toast)
+     */
     public void loggah(String mess, boolean toast) {
         if(gps != null) gps.loggah(mess, toast);
     }
