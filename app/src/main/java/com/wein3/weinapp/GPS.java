@@ -28,11 +28,12 @@ import java.util.Set;
  * This class should provide everything necessary for an Activity to receive GPS data from
  * a USB GPS device.
  *
- * TODO change ugly names (onUSBGPSLocationChanged)
+ * I have tried to use the existence (null or not null) of the this.device as an indicator if the
+ * reading process can work. (But that's just one out of many weird concepts in this class.)
  *
- * TODO check for consistency in checking device, connection, etc.
- *
- * TODO handle detachment when Threads are still running
+ * Please be aware that this product is only a prototype. I am aware that this code is far away from
+ * perfect and that there are still some major bugs (as you might see when reading through the left
+ * TODOs). I tried my best, but I left so much work to do due to time limitations.
  *
  * TODO reduce time to read data (especially with no reception) because only one GGA/sec from sensor
  *
@@ -40,7 +41,7 @@ import java.util.Set;
  *
  * TODO handle crash on ending Activity while Thread is running
  *
- * TODO handle crash on removing USB GPS device while Thread is running
+ * TODO handle crash on removing USB GPS device while Thread is running (handle detachment when Threads are still running)
  *
  * TODO make more comments than Javadocs
  *
@@ -193,6 +194,28 @@ public class GPS implements GPSDataSender {
      */
     private boolean almostDead = false;
 
+    //-------------READING VARIABLES----------------------------------------------------------------
+
+    /**
+     * This represents the index in the buffer where readFromGPS is currently reading data.
+     */
+    private int readIndex = 0;
+
+    /**
+     * Here, the number of bytes read by connection.bulkTransfer(...) in readFromGPS() is stored.
+     */
+    private int readCount = 0;
+
+    /**
+     * This is used for debugging purposes and sets a flag, if a read was possible.
+     */
+    private boolean hasRead = false;
+
+    /**
+     * This is used for debugging purposes and stores the number of bytes read successfully from the buffer.
+     */
+    private int hasReadNumber = 0;
+
     //-------------APPLICATION STUFF----------------------------------------------------------------
 
     /**
@@ -259,13 +282,14 @@ public class GPS implements GPSDataSender {
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
 
-            loggah("permissionReceiver.onReceive()",true);
+            loggah("permissionReceiver.onReceive()",false);
 
             if(ACTION_USB_PERMISSION.equals(action)) {
                 synchronized (this) {
                     //UsbDevice device = (UsbDevice) intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
 
                     if(intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
+                        loggah("USB permission granted.", true);
                         init();
                         hasPermission = true;
                     } else {
@@ -538,13 +562,14 @@ public class GPS implements GPSDataSender {
         return raw.toString();
     }
 
-    //TODO make Javadocs for read, etc.
-
-    private int readIndex = 0;
-    private int readCount = 0;
-    private boolean hasRead = false;
-    private int recLen = 0;
-
+    /**
+     * This methods reads a byte from the device. The buffer is loaded lazy if needed. Therefore
+     * it's recommended to call this method consecutively BUFFLEN times for always receiving the
+     * most recent data.
+     *
+     * @return - a byte read from the buffer
+     * @throws GPSException - is thrown if a device is missing when trying to read. TODO This still doesn't work as expected.
+     */
     private byte readFromGPS() throws GPSException {
         byte b = 0;
 
@@ -558,7 +583,7 @@ public class GPS implements GPSDataSender {
         if(readIndex < readCount) {
             b = bytes[readIndex];
             hasRead = true;
-            recLen++;
+            hasReadNumber++;
             readIndex++;
         } else {
             hasRead = false;
@@ -672,6 +697,7 @@ public class GPS implements GPSDataSender {
     /**
      * This method should be called in an Activity's onDestroy() method. It unregisters all
      * BroadcastReceivers and should disconnect everything "safely" if the Activity is closed.
+     * Only the called in the LAST onDestroy() in the lifecycle of the WHOLE Application.
      */
     public void onDestroy() {
         if(attachReceiver != null) {
@@ -691,7 +717,6 @@ public class GPS implements GPSDataSender {
         closit();
 
         loggah("super.onDestroy() to be called.", false);
-        //TODO don't forget super.onDestroy();
     }
 
     /**
@@ -896,11 +921,13 @@ public class GPS implements GPSDataSender {
         //TODO reduce the synchronized keyword overall because it's rather error-prone
         //we could do this with an ArrayList, but we can only use it once anyways
         this.gpsDataReceiver.onUSBGPSLocationChanged(getLastKnownLatLng());
+        /*
         if(debugLastParsedLatLng != null) {
             Toast.makeText(context, "" + debugLastParsedLatLng.getLatitude() + ", " + debugLastParsedLatLng.getLongitude(), Toast.LENGTH_SHORT).show();
         } else {
             Toast.makeText(context, "null", Toast.LENGTH_SHORT).show();
         }
+        */
     }
 
     @Override

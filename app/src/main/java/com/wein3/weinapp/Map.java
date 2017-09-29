@@ -139,7 +139,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener, Navi
     /**
      * Boolean flag indicating whether or not an external GPS provider should be used.
      */
-    private boolean useExternalGpsDevice = true;
+    private boolean useExternalGpsDevice = false;
     /**
      * Current zoom factor of camera.
      * Negative values indicate that the zoom factor is not set.
