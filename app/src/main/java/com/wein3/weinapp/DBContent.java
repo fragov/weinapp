@@ -112,12 +112,14 @@ public class DBContent extends AppCompatActivity {
                 final Document listItemDocument = (Document) listView.getItemAtPosition(position);
                 final int listItemIndex = position;
                 final CharSequence[] items = {"Delete Item"};
+                final DBAdapter dbAdapter = (DBAdapter) a.getAdapter();
                 AlertDialog.Builder builder = new AlertDialog.Builder(DBContent.this);
                 builder.setTitle("Perform Action");
                 builder.setItems(items, new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int item) {
                         if(item == 0) {
                             try {
+                                dbAdapter.removeDocument(listItemDocument);
                                 listItemDocument.delete();
                             } catch (Exception e) {
                                 Log.e(TAG, "An error happened", e);

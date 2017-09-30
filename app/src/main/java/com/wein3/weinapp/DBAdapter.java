@@ -121,6 +121,14 @@ public class DBAdapter extends BaseAdapter implements DatabaseObserver {
     }
 
     /**
+     * Remove document from database
+     * @param document Document that should be removed
+     */
+    public void removeDocument(Document document) {
+        mainDatabase.remove(document);
+    }
+
+    /**
      * register document in Database
      *
      * @param documents Document
