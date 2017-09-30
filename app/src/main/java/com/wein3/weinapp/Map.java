@@ -296,7 +296,7 @@ public class Map extends AppCompatActivity implements View.OnClickListener,
         fabLocation.setOnClickListener(this);
         fabLocation.setImageResource(R.drawable.ic_gps);
 
-        fabLayers = (FloatingActionButton) findViewById(R.id.fabLayers);
+        fabLayers = (FloatingActionButton) findViewById(R.id.fabStyles);
         fabLayers.setOnClickListener(this);
         fabLayers.setImageResource(R.drawable.ic_layers);
 
@@ -508,7 +508,6 @@ public class Map extends AppCompatActivity implements View.OnClickListener,
                     moveCamera(new LatLng(data.getDoubleExtra("lat", 0.0),
                             data.getDoubleExtra("lng", 0.0)), DEFAULT_ZOOM_FACTOR,
                             CAMERA_ANIMATION_SHORT);
-                    //PolygonInfoListDialogFragment.newInstance(30).show(getSupportFragmentManager(), "dialog");
                 }
                 break;
             case REQUEST_CODE_LOCATION_SOURCE_SETTINGS:
@@ -1066,20 +1065,23 @@ public class Map extends AppCompatActivity implements View.OnClickListener,
     @Override
     public void onClick(View v) {
         switch (v.getId()) {
-            case R.id.fabLayers:
+            case R.id.fabStyles:
+                /**
+                 * Dialog to choose map style
+                 */
                 AlertDialog.Builder builder = new AlertDialog.Builder(this);
-                builder.setTitle(R.string.select_layer_type);
+                builder.setTitle(R.string.select_style);
                 final EditText input = new EditText(this);
                 input.setInputType(InputType.TYPE_CLASS_TEXT);
                 builder.setView(input);
                 final ArrayAdapter<String> arrayAdapter = new ArrayAdapter<String>(Map.this,
                         android.R.layout.select_dialog_item);
-                arrayAdapter.add("Streets");
-                arrayAdapter.add("Outdoors");
-                arrayAdapter.add("Light");
-                arrayAdapter.add("Dark");
-                arrayAdapter.add("Satellite");
-                arrayAdapter.add("Satellite w/ Streets");
+                arrayAdapter.add(getString(R.string.map_style_streets));
+                arrayAdapter.add(getString(R.string.map_style_outdoor));
+                arrayAdapter.add(getString(R.string.map_style_light));
+                arrayAdapter.add(getString(R.string.map_style_dark));
+                arrayAdapter.add(getString(R.string.map_style_satellite));
+                arrayAdapter.add(getString(R.string.map_style_satellite_streets));
 
                 builder.setNegativeButton("cancel", new DialogInterface.OnClickListener() {
                     @Override
@@ -1234,6 +1236,10 @@ public class Map extends AppCompatActivity implements View.OnClickListener,
         polygons.remove(document.getId());
     }
 
+    /**
+     * Parse document and add Feature in our case only polygons to map
+     * @param document Document to parse
+     */
     private void addDocumentAsPolygonToMap(Document document) {
         Object geometry = document.getProperty("geometry");
         if (geometry != null) {

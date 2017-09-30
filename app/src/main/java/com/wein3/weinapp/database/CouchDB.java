@@ -19,22 +19,63 @@ import java.util.Map;
 
 public class CouchDB implements DatabaseSubject {
 
+    /**
+     * Tag for logs
+     */
     private final String TAG = "CouchDB";
+
+    /**
+     * Name for database. Used as name of database on server and name of database file on device
+     */
     private final String databaseName = "wein-couchdb";
+
+    /**
+     * CouchDB server URL
+     */
     private final String couchDbUrl = "https://couchdb-ce198d.smileupps.com/";
+
+    /**
+     * CouchDB Server User Name
+     */
     private final String userName = "admin";
+
+    /**
+     * CouchDB Server User Password
+     */
     private final String userPw = "8da9af572a0c";
+
+    /**
+     * List of Observers, which should be notified about changes in database
+     */
     private List<DatabaseObserver> myObservers;
+
+    /**
+     * List of documents, that are currently stored and retrieved from database
+     */
     private List<Document> documents;
+
+    /**
+     * CouchDB Database Manager
+     */
     private Manager manager = null;
+
+    /**
+     * CouchDB Database
+     */
     private Database database = null;
 
+    /**
+     * Singleton Instance
+     */
     private static CouchDB INSTANCE = null;
 
     private CouchDB(Application application) {
         myObservers = new ArrayList<>();
         documents = new ArrayList<>();
 
+        /**
+         * Create and/or open database on device
+         */
         try {
             manager = new Manager(new AndroidContext(application.getApplicationContext()),
                     Manager.DEFAULT_OPTIONS);
@@ -48,6 +89,7 @@ public class CouchDB implements DatabaseSubject {
         }
 
         if(database != null) {
+            // Query all documents from database
             Query allDocumentsQuery = database.createAllDocumentsQuery();
             QueryEnumerator queryResult = null;
             try {
@@ -55,11 +97,16 @@ public class CouchDB implements DatabaseSubject {
             } catch (CouchbaseLiteException e) {
                 Log.d(TAG, "Couchbase error", e);
             }
+
+            // If there are results notify observers
             for (Iterator<QueryRow> it = queryResult; it.hasNext(); ) {
                 Document document = it.next().getDocument();
                 documents.add(document);
                 this.notifyObserversDocumentsAdded(document);
             }
+
+            // ChangeListener. If documents are added/removed from database
+            // observers should be notified
             database.addChangeListener(new com.couchbase.lite.Database.ChangeListener() {
                 public void changed(com.couchbase.lite.Database.ChangeEvent event) {
                     for (int i = 0; i < event.getChanges().size(); i++) {
@@ -81,6 +128,10 @@ public class CouchDB implements DatabaseSubject {
                 Log.d(TAG, "Malformed URL", e);
             }
 
+            /**
+             * Replications for pulling and pushing documents from/to database
+             */
+
             Replication mPush = database.createPushReplication(syncGatewayURL);
             mPush.setContinuous(true);
             mPush.setAuthenticator(AuthenticatorFactory.createBasicAuthenticator(userName, userPw));
@@ -93,6 +144,11 @@ public class CouchDB implements DatabaseSubject {
         }
     }
 
+    /**
+     * Singleton instance
+     * @param application
+     * @return CouchDB instance
+     */
     public static CouchDB getInstance(Application application) {
         if(INSTANCE == null) {
             INSTANCE = new CouchDB(application);
@@ -100,6 +156,10 @@ public class CouchDB implements DatabaseSubject {
         return INSTANCE;
     }
 
+    /**
+     * Insert String, Object paar to database
+     * @param documentContent Map with names of properties and values
+     */
     public void insert(Map<String, Object> documentContent) {
         Document document = database.createDocument();
         try {
@@ -109,6 +169,11 @@ public class CouchDB implements DatabaseSubject {
         }
     }
 
+    /**
+     * Update a document in database
+     * @param document Document that should be update in database
+     * @param documentContent Updated content
+     */
     public void update(Document document, Map<String, Object> documentContent) {
         try {
             document.putProperties(documentContent);
@@ -117,6 +182,10 @@ public class CouchDB implements DatabaseSubject {
         }
     }
 
+    /**
+     * Remove document from database
+     * @param document Document that should be removed
+     */
     public void remove(Document document) {
         try {
             document.delete();
