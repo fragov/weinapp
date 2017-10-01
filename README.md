@@ -50,3 +50,23 @@ HelperDatabase
 Wir nutzen eine lokale SQLite-Datenbank, die HelperDatabase, um den aktuell verfolgten Weg zwischenzuspeichern. Diese Datenbank ist unabhängig von der Couchbase DB, die zum Abspeichern der fertigen Polygone benutzt wird. Der Grund dafür ist, das unsere Couchbase-Datenbank über das Internet mit einem Server gekoppelt ist und bei entsprechender Internetverbindung mit dem Server synchronisiert wird. Die SQLite-Datenbank hingegen liegt lokal auf dem Handy und muss keine Daten mit einem Server austauschen, zumal die zwischengespeicherten Einträge in der SQLite-Datenbank nicht mehr benötigt werden, sobald das Polygon mit Couchbase abgespeichert ist. Dementsprechend werden beim Beenden der Aufnahme über die clearTable()-Funktion der HelperDatabase alle Einträge der lokalen Datenbank gelöscht. Aus diesem Grund gibt es auch zwei verschiedene Datenbank-Handler-Klassen, eine für Couchbase und eine für SQLite. Da Mapbox relativ viele Ressourcen verbraucht, kommt es gerade bei schwachen Handys häufig vor, dass beim Activity-Wechsel innerhalb der App oder beim Wechsel von Portrait- in den Landscape-Modus die alte Activity nicht pausiert oder gestoppt (onPause() oder onStop()), sondern komplett zerstört (onDestroy()) wird. Das würde natürlich auch den aktuell getrackten Weg zerstören. Daher speichern wir die einzelnen Koordinaten des Trackings in eine einfache SQLite-Tabelle mit zwei Spalten (Längengrad und Breitengrad). Die HelperDatabase-Klasse stellt dafür die notwendigen Methoden bereit. Das erwähnte Abspeichern der Koordinaten passiert an zwei Stellen im Code. Einmal im TrackingBroadcastReceiver, einer inneren Klasse der Map Activity, und ein anderes Mal direkt im TrackingService selbst. Wenn nämlich der TrackingService feststellt, dass er einen Standort nicht als Broadcast verschicken kann, speichert er ihn in die lokale Datenbank, um die Daten nicht zu verlieren. In der onCreate()-Methode der Map Activity werden die Koordinaten dann wieder ausgelesen und in einer Polyline gemalt.
 
 
+Couchbase Database
+==================
+
+Wir nutzen eine Couchbase Datenbank, um die aufgenommenen Polygone zu speichern. Die Datenbank ist nach dem Observer Pattern implementiert, sodass bei einer Änderung in 
+der Datenbank alle entsprechenden Anwendungen (Liste der Polygone, etc) aktualisiert werden.
+
+
+DBContent
+=========
+
+Hier sieht der Benutzer alle gespeicherten Polygone mit den Hauptcharakteristika. Wählt der Nutzer eines der Polygone durch ein kurzes Antippen aus,
+so wird er zur Hauptklasse mit der Karte weitergeleitet und sieht das ausgewählte Polygon eingezeichnet in die Karte. Tippt der Nutzer dahingegen 
+eines der Polygone in der Liste länger an, so kann er das gespeicherte Polygon entweder löschen oder editieren.
+
+
+Layout
+======
+
+Das Layout orientiert sich am Layout der Kartenanwedung GoogleMaps, sodass ein Benutzer der App eine vertraute Umgebung vorfindet und sich schnell zurechtfindet.
+Dafür wird in der Hauptklasse ein DrawerLayout verwendet.
