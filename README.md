@@ -71,8 +71,8 @@ Layout
 Das Layout orientiert sich am Layout der Kartenanwedung GoogleMaps, sodass ein Benutzer der App eine vertraute Umgebung vorfindet und sich schnell zurechtfindet.
 Dafür wird in der Hauptklasse ein DrawerLayout verwendet.
 
-     GPS
-=============
+GPS
+===
 
 Benutzung der Klasse:
 Um die Klasse in Map.java zu benutzen, muss man, wie oben beschrieben, die Flag useExternalGpsDevice auf true setzen und neu kompilieren. Leider geht das noch nicht dynamisch, weil die Klasse noch unfertig (ist ein Prototyp ja sowieso) und provisorisch eingebunden wurde. Mit der Flag auf false kann höchtens die Test-Activity unter dem Menüpunkt "GPS" benutzt werden.
@@ -91,20 +91,20 @@ Lesen der Daten
 Verarbeitung der Daten
 Datenübertragung (z.B. vom TrackingService zur Map)
 
-Ansprechen der USB-Schnittstelle:
+- Ansprechen der USB-Schnittstelle:
 Das größte Problem beim Ansprechen der USB-Schnittstelle war, dass niemand im Team Erfahrung damit hatte. Der Treiber von github hat dort weitergeholfen. Aufgrund weiter bestehender Unwissenheit kann an dieser Stelle nicht mehr erklärt werden.
 
-Lesen der Daten:
+- Lesen der Daten:
 Problem: Pro Sekunde wird nur ein Paket von 6 NMEA-Sätzen vom Gerät bereitgestellt. Das heißt, der GGA-Datensatz, den man benötigt, wird nur einmal pro Sekunde gelesen. Bei GPS-Empfang ist das kein Problem, da alle Felder des Satzes besetzt sind. Ohne GPS-Empfang sind die Felder jedoch leer. D.h. es passen mehr Sätze in den Buffer, aber es dauert deswegen auch länger, bis dieser vollgeschrieben ist. Das führt zu einer längeren Lesezeit.
 Bei einem festen Polling-Intervall kann das dazu führen, dass die Lesezeit das Intervall überschreitet. Dadurch entstehen mehre Threads gleichzeitig, was zu einem Slowdown oder sogar einem Absturz führt.
 Lösung: Multithreading (damit die lange Lesedauer im Hintergrund ausgeführt wird) und Verzichten auf ein festes Polling-Intervall...
 
-Verarbeitung der Daten:
+- Verarbeitung der Daten:
 Aus dem vollen Buffer bekommt man dann einen String. Mit den String-Methoden in Java kann man diesen ganz einfach zerlegen und nach einem GGA-Datensatz suchen. mit split(",") kommt man dann in diesem Satz an die einzelnen Einträge. Praktischerweise sind dann dieselben Werte immer an derselben Stelle im Array.
 Problem: Das umwandeln der Daten in double-Werte ist etwas problematisch. Man kann die Strings mit Breiten- und Längengrad nicht einfach parsen. Zwar bekäme man dann auch double-Werte, allerdings sind diese falsch. Ich habe keine Ahnung, warum der Gerätehersteller entschieden hat, die werte als Dezimalzahlen weiterzugeben, aber eigentlich liegen die Rohdaten im Grad-Minute-Sekunden-Format vor.
 Lösung: Man zerlegt einfach die Rohdaten in einzelne Werte für Minuten und Sekunden und rechnet diese dann in Anteile eines Grades um, um eine valide Dezimalzahl zu erzeugen, die von Mapbox benötigt wird.
 
-Datenübertragung:
+- Datenübertragung:
 Zur Datenübertragung registriert man einfach einen GPSDataReceiver (das ist auch ein Interface, das die Klasse, die Location-Updates erhalten will, implementieren soll) in der GPS-Klasse. Dann ruft das GPS bei einem Update die implementierte Methode aus dem Interface auf.
 Problematisch wird aber die Nutzung der Klasse in mehreren Klassen mit verschiedenen Contexts: Wir bekommen die Daten vom GPS in einem Service, wollen aber schon vorher in der Activity das externe GPS initialisieren und auch nachher Daten vom Service zur Activity bekommen. Man kann aber leider keine Referenz zur GPS-Klasse mit einem Intent an den TrackingService weitergeben.
 Lösung:
