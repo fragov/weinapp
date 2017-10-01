@@ -9,8 +9,7 @@ import android.widget.TextView;
 import com.mapbox.mapboxsdk.geometry.LatLng;
 
 /**
- * This Activity has no explanation because we won't need this in our finished application.
- * For now, it's just a simple way to test the GPS class.
+ * This activity is showing, how the GPS class should be implemented.
  */
 public class GPSTester extends AppCompatActivity implements GPSDataReceiver {
 
@@ -40,6 +39,9 @@ public class GPSTester extends AppCompatActivity implements GPSDataReceiver {
      */
     private Button multithreadToaster;
 
+    /**
+     * This is a reference to the GPS.
+     */
     private GPS gps;
 
     @Override
@@ -53,8 +55,11 @@ public class GPSTester extends AppCompatActivity implements GPSDataReceiver {
         satTime = (TextView) findViewById(R.id.satTime);
         multithreadToaster = (Button) findViewById(R.id.multithreadToaster);
 
+        //call this in the initialization, but be aware that gps.startPolling() won't work immediately.
         gps = GPS.getInstance(this);
+        //this class is some kind of Observer (GPSDataReceiver) which has to be registered
         gps.registerReceiver(this);
+        //you can set this but it's just ignored in this Version
         gps.setPollingInterval(10000);
 
         getLatLong.setOnClickListener(new View.OnClickListener() {
@@ -65,6 +70,8 @@ public class GPSTester extends AppCompatActivity implements GPSDataReceiver {
                     return;
                 }
                 if(!gps.isPollerSet()) {
+                    //call this in the button (or like in the main Activity in the Service) to make
+                    //sure that the GPS is already initialized
                     gps.startPolling();
                     getLatLong.setText("stop polling");
                 } else {
@@ -74,6 +81,7 @@ public class GPSTester extends AppCompatActivity implements GPSDataReceiver {
             }
         });
 
+        //this is just a toast-displaying button to make sure that multithreading is working
         multithreadToaster.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -83,7 +91,7 @@ public class GPSTester extends AppCompatActivity implements GPSDataReceiver {
     }
 
     /**
-     * Conveniently call the logging method from the gps.
+     * Conveniently calls the logging method from the gps.
      *
      * @param mess - look at gps.loggah(mess, toast)
      * @param toast - look at gps.loggah(mess, toast)
@@ -94,6 +102,8 @@ public class GPSTester extends AppCompatActivity implements GPSDataReceiver {
 
     @Override
     protected void onDestroy() {
+        //Call this to close the connection on the end of this Activity (or e.g. the Tracking service).
+        //Consider using gps.onDestroy() in the onDestroy() method of the main Activity
         if(gps != null) gps.closit();
         loggah("GPSTester.closit()", false);
         super.onDestroy();
@@ -107,7 +117,6 @@ public class GPSTester extends AppCompatActivity implements GPSDataReceiver {
             textViewLong.setText(Double.toString(loc.getLongitude()));
             satTime.setText(Double.toString(location.getAltitude()));
         } else {
-            //loggah("No GPS.", true);
             textViewLat.setText("FAIL");
             textViewLong.setText("FAIL");
             satTime.setText("FAIL");

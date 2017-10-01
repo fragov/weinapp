@@ -37,21 +37,11 @@ import java.util.Set;
  *
  * TODO reduce time to read data (especially with no reception) because only one GGA/sec from sensor
  *
- * TODO look at log.txt on Desktop for random, weirdly corrupted and error-causing examples...
+ * TODO handle crash on ending Activity while PollingClock is running
  *
- * TODO handle crash on ending Activity while Thread is running
- *
- * TODO handle crash on removing USB GPS device while Thread is running (handle detachment when Threads are still running)
- *
- * TODO make more comments than Javadocs
- *
- * TODO for use in TrackingService: make sure that the context set in the activity survives when that activity is killed and we want to access this context in the service. Other idea: make method to set a new context (for now, getInstance(Context) does the same).
+ * TODO handle crash on removing USB GPS device while PollingClock is running (handle detachment when Threads are still running)
  *
  * TODO handle closit(): device is set null, but this interferes with the singleton concept
- *
- * TODO Please be aware of the fact that the Service can still run when onDestroy() of Activity is called (ignore this for now)
- *
- * TODO check checksum
  *
  */
 public class GPS implements GPSDataSender {
@@ -59,12 +49,12 @@ public class GPS implements GPSDataSender {
     //-------------FINAL VARIABLES------------------------------------------------------------------
 
     /**
-     * String to test for wrong result when extracting NMEA sentences.
+     * <code>String</code> to test for wrong result when extracting NMEA sentences.
      */
     private static final String FAILED_RESULT = "$No Result";
 
     /**
-     * String to give back if no device was found.
+     * <code>String</code> to give back if no device was found.
      */
     private static final String NO_DEVICE = "No device found.";
 
@@ -74,7 +64,8 @@ public class GPS implements GPSDataSender {
     private static final String LCDT = "LogCatDemoTag";
 
     /**
-     * Name of the Action of the Intent which should be received by permissionReceiver.
+     * Name of the <code>Action</code> of the <code>Intent</code> which should be received by
+     * the <code>permissionReceiver</code>.
      */
     private static final String ACTION_USB_PERMISSION = "com.android.example.USB_PERMISSION";
 
@@ -86,13 +77,13 @@ public class GPS implements GPSDataSender {
     //-------------VARIABLES RELATED TO MULTITHREADING AND DATA TRANSFER----------------------------
 
     /**
-     * This is the GPS singleton. Singletons are useful if we only want one instance of a class,
-     * like in this case.
+     * This is the <code>GPS</code> singleton. Singletons are useful if we only want one instance of
+     * a class, like in this case.
      */
     private static GPS gpsSingleton;
 
     /**
-     * This is the GPSDataReceiver which receives updates if the location has changed.
+     * This is the <code>GPSDataReceiver</code> which receives updates if the location has changed.
      *
      * TODO can be replaced with a List of GPSDataReceivers in the future
      */
@@ -104,7 +95,7 @@ public class GPS implements GPSDataSender {
     private long pollingInterval = -1;
 
     /**
-     * Variable for access to the PollingClock Runnable.
+     * Variable for access to the <code>PollingClock</code> <code>Runnable</code>.
      */
     private PollingClock pollingClock;
 
@@ -114,7 +105,7 @@ public class GPS implements GPSDataSender {
     private LatLng lastKnownLatLng;
 
     /**
-     * This is used to store the last parsed location. In wrong degree format.
+     * This is used to store the last parsed location. In "wrong" degree format.
      */
     public LatLng debugLastParsedLatLng;
 
@@ -131,7 +122,8 @@ public class GPS implements GPSDataSender {
     private static final int TIMEOUT = 1000;
 
     /**
-     * Buffer length (important to consider if read freshest data has to be read).
+     * Buffer length (it's important to read <code>BUFFLEN</code> bytes consecutively if the
+     * freshest data has to be read).
      */
     private static final int BUFFLEN = 1024;
 
@@ -141,7 +133,7 @@ public class GPS implements GPSDataSender {
     private static final int baudRate = 4800;
 
     /**
-     * Use this to get devices an establish a connection.
+     * Use this to get devices and establish a connection.
      */
     private UsbManager manager;
 
@@ -151,7 +143,7 @@ public class GPS implements GPSDataSender {
     private UsbDevice device;
 
     /**
-     * This represents the connection to the device.
+     * This represents the <code>connection</code> to the <code>device</code>.
      */
     private UsbDeviceConnection connection;
 
@@ -168,41 +160,41 @@ public class GPS implements GPSDataSender {
     //-------------FLAGS TO REPRESENT CURRENT STATE-------------------------------------------------
 
     /**
-     * true, if connection is initialized.
+     * <code>true</code>, if connection is initialized.
      */
     private boolean isInit = false;
 
     /**
-     * true, if we have an endpoint. Important to know before trying to read data.
+     * <code>true</code>, if we have an <code>endpoint</code>.
+     * Important to know before trying to read data.
      */
     private boolean hasEndpoint = false;
 
     /**
-     * check if we currently receive updates from the poller
+     *  Shows if we currently receive updates from the <code>Poller</code>.
      */
     private boolean isPollerSet = false;
 
     /**
-     * This indicates if there is a permission to access the USB device.
-     *
-     * TODO this is a simple way, but I should use Android to get this information
+     * This indicates if there is a permission to access the USB <code>device</code>.
      */
     private boolean hasPermission = false;
 
     /**
-     * Flag shows if this Object has to die.
+     * Flag shows if this <code>Object</code> has to die.
      */
     private boolean almostDead = false;
 
     //-------------READING VARIABLES----------------------------------------------------------------
 
     /**
-     * This represents the index in the buffer where readFromGPS is currently reading data.
+     * This represents the index in the buffer where <code>readFromGPS()</code> is currently reading data.
      */
     private int readIndex = 0;
 
     /**
-     * Here, the number of bytes read by connection.bulkTransfer(...) in readFromGPS() is stored.
+     * Here, the number of bytes read by <code>connection.bulkTransfer(...)</code> in
+     * <code>readFromGPS()</code> is stored.
      */
     private int readCount = 0;
 
@@ -219,12 +211,12 @@ public class GPS implements GPSDataSender {
     //-------------APPLICATION STUFF----------------------------------------------------------------
 
     /**
-     * This is not an Activity, so a context has to be stored somewhere.
+     * This is not an <code>Activity</code>, so a <code>Context</code> has to be stored somewhere.
      */
     private static Context context;
 
     /**
-     * This BroadcastReceiver is used to detect if a USB device is attached.
+     * This <code>BroadcastReceiver</code> is used to detect if a USB <code>device</code> is attached.
      */
     private final BroadcastReceiver attachReceiver = new BroadcastReceiver() {
         @Override
@@ -237,8 +229,6 @@ public class GPS implements GPSDataSender {
             if(UsbManager.ACTION_USB_DEVICE_ATTACHED.equals(action)) {
                 UsbDevice device = (UsbDevice) intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
                 if(device != null) {
-                    //PendingIntent permissionIntent = PendingIntent.getBroadcast(context, 0, new Intent(ACTION_USB_PERMISSION), 0);
-                    //manager.requestPermission(device, permissionIntent);
                     onCreate();
                     loggah("ATTACHED - not null", false);
                 } else {
@@ -249,7 +239,7 @@ public class GPS implements GPSDataSender {
     };
 
     /**
-     * This BroadcastReceiver is used to detect if a USB device is detached.
+     * This <code>BroadcastReceiver</code> is used to detect if a USB <code>device</code> is detached.
      */
     private final BroadcastReceiver detachReceiver = new BroadcastReceiver() {
         @Override
@@ -262,8 +252,6 @@ public class GPS implements GPSDataSender {
             if(UsbManager.ACTION_USB_DEVICE_DETACHED.equals(action)) {
                 UsbDevice device = (UsbDevice) intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
                 if(device != null) {
-                    //connection.releaseInterface(intf);
-                    //connection.close();
                     closit();
                     loggah("DETACHED - not null", false);
                 } else {
@@ -274,8 +262,8 @@ public class GPS implements GPSDataSender {
     };
 
     /**
-     * This BroadcastReceiver is used to establish a connection if the permission to access the
-     * USB device was granted.
+     * This <code>BroadcastReceiver</code> is used to establish a <code>connection</code> if the
+     * permission to access the USB <code>device</code> was granted.
      */
     private final BroadcastReceiver permissionReceiver = new BroadcastReceiver() {
         @Override
@@ -286,8 +274,6 @@ public class GPS implements GPSDataSender {
 
             if(ACTION_USB_PERMISSION.equals(action)) {
                 synchronized (this) {
-                    //UsbDevice device = (UsbDevice) intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
-
                     if(intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
                         loggah("USB permission granted.", true);
                         init();
@@ -301,7 +287,8 @@ public class GPS implements GPSDataSender {
     };
 
     /**
-     * This handler is used to receive Messages from the Poller Runnable.
+     * This <code>handler</code> is used to receive <code>Message</code>s from the
+     * <code>Poller</code> <code>Runnable</code>.
      */
     private final Handler pollHandler = new Handler() {
         @Override
@@ -320,10 +307,10 @@ public class GPS implements GPSDataSender {
 
     /**
      * Most important tasks of this constructor are:
-     *      -getting the UsbManager
-     *      -register the BroadcastReceivers
+     *      -getting the <code>UsbManager</code>
+     *      -register the <code>BroadcastReceiver</code>s
      *
-     * @param context - stores the context we need to access for certain methods
+     * @param context - stores the <code>context</code> we need to access for certain methods
      */
     private GPS(Context context) {
         this.context = context;
@@ -340,7 +327,7 @@ public class GPS implements GPSDataSender {
     }
 
     /**
-     * This method return the instance of GPS. If an instance already exist, just set the context in it.
+     * This method return the instance of GPS. If an instance already exists, just set the context in it.
      *
      * @param context - context used by GPS
      *
@@ -348,15 +335,20 @@ public class GPS implements GPSDataSender {
      */
     public static GPS getInstance(Context context) {
         if(GPS.gpsSingleton == null) {
+            //create new GPS Object
             GPS.gpsSingleton = new GPS(context);
         } else {
+            //or just change the context
             GPS.context = context;
+            //don't forget to re-register the BroadcastReceivers in the new context
             GPS.gpsSingleton.registerBroadcastReceivers();
         }
         if(GPS.gpsSingleton.device == null) {
+            //get device
             GPS.gpsSingleton.onCreate();
             GPS.gpsSingleton.loggah("getInstance() -> onCreate()",false);
             if(GPS.gpsSingleton.device != null) {
+                //get connection
                 GPS.gpsSingleton.init();
                 GPS.gpsSingleton.loggah("getInstance() -> init()",false);
             }
@@ -365,7 +357,7 @@ public class GPS implements GPSDataSender {
     }
 
     /**
-     * This method is used to register the Broadcast Receivers. That's necessary every time a new
+     * This method is used to register the BroadcastReceivers. That's necessary every time a new
      * Context is set.
      */
     private void registerBroadcastReceivers() {
@@ -384,26 +376,32 @@ public class GPS implements GPSDataSender {
     //-------------READING METHODS------------------------------------------------------------------
 
     /**
-     * This returns the last known location. If no Poller is set, this method calls setLastKnownLatLng.
+     * This returns the last known location. If no PollingClock is set, this method calls setLastKnownLatLng().
      * Please be aware that that method would be executed in the UI Thread so it is not recommended
-     * to use it directly. Instead, consider using a Poller.
+     * to use it directly. Instead, consider using a PollingClock.
      *
      * @return - last known location in LatLng
      */
     public LatLng getLastKnownLatLng() {
+
+        //this is only called there is no Poller
         if(!isPollerSet) setLastKnownLatLng();
+
         return this.lastKnownLatLng;
     }
 
     /**
      * This calculates the current location.
-     * Please be aware that this method needs a lot of time.
+     * Please be aware that this method needs a lot of time, so consider using multithreading.
+     * Multithreading is currently implemented by the PollingClock
      *
      * TODO removing the synchronized keyword should not have been done, but somehow it fixed the slowdown problem (yay)
      */
     private void setLastKnownLatLng() {
+        //get a GGA NMEA sentence
         String gga = getFirstGGAString();
         loggah("GGA String - " + gga, false);
+        //parse the sentence into coordinates
         this.lastKnownLatLng = ggaToLatLng(gga);
         if(this.lastKnownLatLng != null) {
             loggah("Coordinates: " + lastKnownLatLng.getLatitude() + "," + lastKnownLatLng.getLongitude(), false);
@@ -411,28 +409,33 @@ public class GPS implements GPSDataSender {
     }
 
     /**
-     * This returns a LatLng object with the coordinates specified in the parameter, which has to be
+     * This returns a LatLng object with the coordinates specified by the parameter, which has to be
      * a String containing an NMEA GGA sentence.
      *
      * @param gga - GGA dataset
      * @return - LatLng with location from GGA dataset
      */
     public LatLng ggaToLatLng(String gga) {
+        //check for valid sentences
         if(gga.equals(FAILED_RESULT)) {
             loggah("Got invalid information from sensor.", true);
             Log.e(LCDT, "Got invalid information from sensor.");
             return null;
         }
+        //get single parameters
         String[] parts = gga.split(",");
 
+        //prepare debug message
         String toasterMessage = "";
         boolean toasted = false;
 
         double lat = 0;
         double debugLat = 0;
         try {
+            //check if data is coming as expected
             if(parts[2].length() != 9) throw new NumberFormatException("No Latitude.");
 
+            //get the information for degree, minutes, seconds
             String latDeg = parts[2].substring(0, 2);
             String latMin = parts[2].substring(2, 4);
             String latSec = parts[2].substring(5, 7) + "." + parts[2].substring(7);
@@ -441,19 +444,19 @@ public class GPS implements GPSDataSender {
             double lam = Double.parseDouble(latMin);
             double las = Double.parseDouble(latSec);
 
+            //convert it into a valid double value
             las /= 60;
             lam += las;
             lam /= 60;
-
             lat = lad + lam;
 
-
-
+            //just parse the "wrong" double value from the raw data
             debugLat = Double.parseDouble(parts[2]) / 100;
         } catch (NumberFormatException e) {
             toasterMessage += "No Latitude";
             toasted = true;
         }
+        //make hemisphere adjustments
         if(parts[3].equals("S")) {
             lat *= -1;
         }
@@ -461,8 +464,10 @@ public class GPS implements GPSDataSender {
         double lng = 0;
         double debugLng = 0;
         try {
+            //check if data is coming as expected
             if(parts[4].length() != 10) throw new NumberFormatException("No Longitude.");
 
+            //get the information for degree, minutes, seconds
             String longDeg = parts[4].substring(0, 3);
             String longMin = parts[4].substring(3, 5);
             String longSec = parts[4].substring(6, 8) + "." + parts[4].substring(8);
@@ -471,14 +476,13 @@ public class GPS implements GPSDataSender {
             double lom = Double.parseDouble(longMin);
             double los = Double.parseDouble(longSec);
 
+            //convert it into a valid double value
             los /= 60;
             lom += los;
             lom /= 60;
-
             lng = lod + lom;
 
-
-
+            //just parse the "wrong" double value from the raw data
             debugLng = Double.parseDouble(parts[4]) / 100;
         } catch (NumberFormatException e) {
             if(toasted) {
@@ -488,23 +492,29 @@ public class GPS implements GPSDataSender {
             }
             toasted = true;
         }
+        //make hemisphere adjustments
         if(parts[5].equals("W")) {
             lat *= -1;
         }
 
         if(toasted) {
+            //set complete toaster message and return null (null means: no gps reception)
             toasterMessage += " found.";
+            //the Toast isn't actually displayed anymore, but the message is still logged
             loggah(toasterMessage, false);
             return null;
         }
+
+        //prepare return value("s")
         LatLng retVal = new LatLng(lat, lng);
         this.debugLastParsedLatLng = new LatLng(debugLat, debugLng);
         try {
+            //get the time when data was received from the device
             double alt = Double.parseDouble(parts[1]);
-            //TODO don't set wrong altitude, dude
+            //TODO don't set wrong altitude, time was just for debugging
             retVal.setAltitude(alt);
         } catch (NumberFormatException e) {
-            loggah("Time Fail", false);
+            loggah("Time Fail.", false);
         }
         return retVal;
     }
@@ -515,15 +525,19 @@ public class GPS implements GPSDataSender {
      * @return - GGA dataset
      */
     private String getFirstGGAString() {
+        //get raw data (already as String)
         String data = getSomeData();
 
         StringBuilder builder = new StringBuilder();
+        //get single NMEA sentences separated by $ (they are actually beginning with $)
         String[] sentences = data.split("\\$");
         loggah("Data length: " + data.length() + "; Array Length: " + sentences.length, false);
         String result = "No Result";
         for(String sen: sentences) {
             if(sen.equals("")) continue;
+            //look for the right protocol
             if(sen.startsWith("GPGGA")) {
+                //set the right sentence as result
                 result = sen;
                 break;
             }
@@ -535,15 +549,15 @@ public class GPS implements GPSDataSender {
     }
 
     /**
-     * Read BUFFLEN bytes in a buffer and turn the buffer into a String.
+     * Read <code>BUFFLEN</code> bytes in a buffer and turn the buffer into a String.
      *
      * @return - raw data as a String
      */
     private String getSomeData() {
+        //allocate new memory for the buffer (maybe this has not to be done every time)
         bytes = new byte[BUFFLEN];
 
-        //connection.bulkTransfer(endpoint, bytes, bytes.length, TIMEOUT);
-
+        //measure time for log
         long then = System.currentTimeMillis();
 
         StringBuilder raw = new StringBuilder();
@@ -553,8 +567,10 @@ public class GPS implements GPSDataSender {
             try {
                 c = (char) readFromGPS();
             } catch (GPSException e) {
+                //this was intended to work if device is disconnected during the reading process
                 return NO_DEVICE;
             }
+            //get char and put it into a StringBuilder
             raw.append(c);
         }
 
@@ -575,17 +591,22 @@ public class GPS implements GPSDataSender {
     private byte readFromGPS() throws GPSException {
         byte b = 0;
 
+        //if all data in the buffer is read, get new data
         if(readIndex >= readCount) {
             if(device == null) {
+                //throw Exception if read is impossible
                 throw new GPSException(NO_DEVICE);
             }
             readCount = connection.bulkTransfer(endpoint, bytes, BUFFLEN, TIMEOUT);
+            //set reading index to the first element in the buffer
             readIndex = 0;
         }
+        //call this if there is still unread data in the buffer
         if(readIndex < readCount) {
             b = bytes[readIndex];
             hasRead = true;
             hasReadNumber++;
+            //move index forward
             readIndex++;
         } else {
             hasRead = false;
@@ -639,9 +660,11 @@ public class GPS implements GPSDataSender {
         //TODO test all connected devices with nested loops
         Iterator<UsbDevice> iterator = manager.getDeviceList().values().iterator();
         if(iterator.hasNext()) {
+            //get one device (usually the only device)
             device = iterator.next();
         }
 
+        //check for errors
         boolean nullHoldsAtOnCreate = false;
         boolean emptyDeviceListHoldsAtOnCreate = false;
 
@@ -653,6 +676,7 @@ public class GPS implements GPSDataSender {
             return;
         }
 
+        //check for correct device
         DeviceInfoWrapper currDiw = new DeviceInfoWrapper(device.getVendorId(), device.getProductId());
         boolean supportedDeviceConnected = false;
         for(DeviceInfoWrapper diw: possibleDevicesList) {
@@ -666,6 +690,7 @@ public class GPS implements GPSDataSender {
             loggah("No supported device connected: " + currDiw.vendorId + ", " + currDiw.productId, false);
         }
 
+        //request permission for device
         if(!hasPermission) {
             PendingIntent permissionIntent = PendingIntent.getBroadcast(context, 0, new Intent(ACTION_USB_PERMISSION), 0);
             manager.requestPermission(device, permissionIntent);
@@ -677,7 +702,9 @@ public class GPS implements GPSDataSender {
      */
     public void closit() {
         loggah("Entered closit().", false);
+        //stop polling (still a bit buggy when called from here)
         this.stopPolling();
+        //close connection
         if(connection != null) {
             if(hasEndpoint && connection.releaseInterface(intf)) {
                 loggah("Released interface.", false);
@@ -686,11 +713,13 @@ public class GPS implements GPSDataSender {
         } else {
             loggah("Connection is null on closit().",  false);
         }
+        //remove device
         if(device != null) {
             device = null;
         } else {
             loggah("Device is null on closit().",  false);
         }
+        //reset status
         isInit = false;
         hasEndpoint = false;
         hasPermission = false;
@@ -699,7 +728,7 @@ public class GPS implements GPSDataSender {
     /**
      * This method should be called in an Activity's onDestroy() method. It unregisters all
      * BroadcastReceivers and should disconnect everything "safely" if the Activity is closed.
-     * Only the called in the LAST onDestroy() in the lifecycle of the WHOLE Application.
+     * Only to be called in the LAST onDestroy() in the lifecycle of the WHOLE Application.
      */
     public void onDestroy() {
         if(attachReceiver != null) {
@@ -728,20 +757,26 @@ public class GPS implements GPSDataSender {
         if(!isInit) {
             isInit = true;
 
+            //get device (if not already done)
             this.onCreate();
 
+            //init buffer for transfer control
             bytes = new byte[BUFFLEN];
 
+            //for further explanations see:
             //https://developer.android.com/guide/topics/connectivity/usb/host.html#working-d
+            //get connection
             connection = manager.openDevice(device);
             if(connection != null) {
                 loggah("Got connection. Interface count: " + device.getInterfaceCount(), false);
+                //get interface
                 intf = device.getInterface(0);
                 loggah("Endpoint count: " + intf.getEndpointCount(), false);
 
                 for(int i=0; i<intf.getEndpointCount(); i++) {
                     UsbEndpoint temp = intf.getEndpoint(i);
                     if(temp.getType() == UsbConstants.USB_ENDPOINT_XFER_BULK && temp.getDirection() == UsbConstants.USB_DIR_IN) {
+                        //finally get endpoint
                         endpoint = temp;
                     }
                 }
@@ -750,8 +785,8 @@ public class GPS implements GPSDataSender {
                     loggah("Hazn Endpoint.", false);
                     connection.claimInterface(intf, true);
                     byte[] buffer = new byte[1];
+                    //got this transfer control parameters from:
                     //https://github.com/sintrb/Android-PL2303HXA/blob/master/Android-PL2303HXA/src/com/sin/android/usb/pl2303hxa/PL2303Driver.java
-                    //TODO erklären können, sonst wäre das nur abgeschrieben
                     ctWrapper(192, 1, 33924, 0, buffer, 1, TIMEOUT);
                     ctWrapper(64, 1, 1028, 0, null, 0, TIMEOUT);
                     ctWrapper(192, 1, 33924, 0, buffer, 1, TIMEOUT);
@@ -786,6 +821,8 @@ public class GPS implements GPSDataSender {
      * @return - a result value to check for errors
      */
     private int ctWrapper(int requestType, int request, int value, int index, byte[] buffer, int lenght, int timeout) {
+        //just pass these parameters to connection.controlTransfer() and use the return value
+        //to check for errors
         int res = connection.controlTransfer(requestType, request, value, index, buffer, lenght, timeout);
         if(res < 0) Log.e(LCDT, "ctErrorBLABWAAH");
         return res;
@@ -904,7 +941,7 @@ public class GPS implements GPSDataSender {
      */
     @Override
     public void registerReceiver(GPSDataReceiver gpsDataReceiver) {
-        //we could do this with an ArrayList, but we can only use it once
+        //we could do this with an ArrayList, but we can only use it once anyways
         this.gpsDataReceiver = gpsDataReceiver;
     }
 
@@ -931,6 +968,8 @@ public class GPS implements GPSDataSender {
         if(millis > 9999) {
             this.pollingInterval = millis;
         } else {
+            //this looooong time comes from errors with a fixed and too short interval
+            //and can be changed in the future if a polling interval is reconsidered
             this.pollingInterval = 10000;
             Log.i(LCDT, "Polling interval set to 10 seconds.");
         }
@@ -959,20 +998,16 @@ public class GPS implements GPSDataSender {
             if(this.pollingInterval > 9999) {
                 this.pollingClock = new PollingClock(this.pollingInterval);
             } else {
+                //this looooong time comes from errors with a fixed and too short interval
+                //and can be changed in the future if a polling interval is reconsidered
                 this.pollingClock = new PollingClock(10000);
                 Log.i(LCDT, "Polling interval set to 10 seconds.");
             }
-            /*
-            Thread pollingClockThread = new Thread() {
-                public void run() {
-                    handler.post(GPS.this.pollingClock);
-                }
-            };
-            */
-
+            //start thread
             Thread pollingClockThread = new Thread(this.pollingClock);
             pollingClockThread.start();
 
+            //this doesn't work:
             //this.directPoller = new DirectPoller();
             //Thread t = new Thread(this.directPoller);
             //t.start();
@@ -980,6 +1015,7 @@ public class GPS implements GPSDataSender {
             loggah("Polling started", true);
             return true;
         } else {
+            //reset values if start failed
             loggah("Polling start failed.", true);
             this.pollingClock = null;
             this.directPoller = null;
@@ -991,6 +1027,7 @@ public class GPS implements GPSDataSender {
     @Override
     public void stopPolling() {
         //TODO human-generated method stub
+        //stop the Threads
         if(this.pollingClock != null) {
             this.pollingClock.stop();
             loggah("Polling stopped.", true);
@@ -1004,6 +1041,8 @@ public class GPS implements GPSDataSender {
         if(this.almostDead && this.isPollerSet) {
             synchronized (this) {
                 try {
+                    //this is buggy, but this should prevent to kill the process when the
+                    //Poller Thread is still running
                     this.wait();
                 } catch (InterruptedException e) {
                     e.printStackTrace();
@@ -1051,17 +1090,12 @@ public class GPS implements GPSDataSender {
         @Override
         public void run() {
             while(!stopFlag) {
-                /*
-                Thread thread = new Thread() {
-                    public void run() {
-                        handler2.post(new Poller());
-                    }
-                };
-                */
+                //Start a separate Thread. One thread could be sufficient (e.g. DirectPoller and not
+                //PollingClock creating Poller-Threads), but when a fixed polling interval has to be
+                //used, we need these nested Threads
                 Thread thread = new Thread(new Poller(this));
                 thread.start();
                 try {
-                    //Thread.sleep(this.wait);
                     this.t_lock();
                 } catch (InterruptedException e) {
                     Log.e(LCDT, "Couldn't wait in PollingClock.");
@@ -1087,9 +1121,7 @@ public class GPS implements GPSDataSender {
         }
 
         /**
-         * Call notify on this Thread.
-         *
-         * TODO chack if synchronized is necessary
+         * Call notify on this Thread. Called from outside.
          */
         public synchronized void t_unlock() {
             this.notify();
@@ -1117,14 +1149,20 @@ public class GPS implements GPSDataSender {
 
         @Override
         public void run() {
+            //get the data from the device
             GPS.this.setLastKnownLatLng();
+            //handle message (inter-Thread-communication
             Message mess = pollHandler.obtainMessage();
             Bundle b = new Bundle();
             b.putString("mess", "gotMess");
             mess.setData(b);
             pollHandler.sendMessage(mess);
+            //wake up the thread for a new Poller to be executed
             pc.t_unlock();
             if(GPS.this.almostDead) {
+                //if the process in the UI Thread ends, it should wait for the notify, because
+                //otherwise, it's not guaranteed that this Thread can still access all necessary
+                //methods and data
                 GPS.this.notify();
             }
         }
@@ -1152,13 +1190,18 @@ public class GPS implements GPSDataSender {
         @Override
         public void run() {
             while(!stopFlag) {
+                //get the data from the device
                 GPS.this.setLastKnownLatLng();
+                //handle message (inter-Thread-communication
                 Message mess = pollHandler.obtainMessage();
                 Bundle b = new Bundle();
                 b.putString("mess", "gotMess");
                 mess.setData(b);
                 pollHandler.sendMessage(mess);
                 if(GPS.this.almostDead) {
+                    //if the process in the UI Thread ends, it should wait for the notify, because
+                    //otherwise, it's not guaranteed that this Thread can still access all necessary
+                    //methods and data
                     GPS.this.notify();
                 }
             }

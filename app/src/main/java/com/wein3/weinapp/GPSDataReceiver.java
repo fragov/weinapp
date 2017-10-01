@@ -9,6 +9,7 @@ import com.mapbox.mapboxsdk.geometry.LatLng;
 public interface GPSDataReceiver {
     /**
      * This method is called from GPSDataSender if location has changed.
+     * Implement this method to receive location updates.
      *
      * @param location - new location
      */

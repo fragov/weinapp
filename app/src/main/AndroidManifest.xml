@@ -31,7 +31,7 @@
             </intent-filter>
         </activity>
         <activity android:name=".GPSTester">
-
+            <!-- use this intent filter for starting the app when connecting the USB device -->
             <!--
             <intent-filter>
                 <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
