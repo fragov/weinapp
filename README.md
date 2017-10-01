@@ -70,3 +70,42 @@ Layout
 
 Das Layout orientiert sich am Layout der Kartenanwedung GoogleMaps, sodass ein Benutzer der App eine vertraute Umgebung vorfindet und sich schnell zurechtfindet.
 Dafür wird in der Hauptklasse ein DrawerLayout verwendet.
+
+     GPS
+=============
+
+Benutzung der Klasse:
+Um die Klasse in Map.java zu benutzen, muss man, wie oben beschrieben, die Flag useExternalGpsDevice auf true setzen und neu kompilieren. Leider geht das noch nicht dynamisch, weil die Klasse noch unfertig (ist ein Prototyp ja sowieso) und provisorisch eingebunden wurde. Mit der Flag auf false kann höchtens die Test-Activity unter dem Menüpunkt "GPS" benutzt werden.
+Die USB-Events werden eigentlich automatisch behandelt (falls die Klasse richtig in eine Activity eingebunden wurde). Dann wird eine Verbindung zum Gerät hergestellt und man kann dann später den Polling-Prozess starten um Location-Updates zu bekommen. Aktuell gibt es noch Probleme mit dem Multithreading, also sollte man den Polling-Prozess in der Activity manuell beenden und dann erst die Activity beenden oder das Gerät entfernen.
+Genaueres sollte in der Klasse GPSTester.java stehen (bitte auch Kommentare beachten).
+
+Bevor ich auf die Funktionalität der Klasse eingehe, möchte ich auf meinen Einstieg in das Thema eingehen:
+Mangels Erfahrung mit dem Thema wurde sehr viel Zeit mit der Recherche und mit Testen (auch mit viel Trial-and-Error) verbracht. Deswegen wird aktuell nur ein Sensor (Navilock NL-650US mit GPS-Chipsatz MediaTek MT3337 und der RS-232 to USB-Schnittstelle Prolific PL-2303HXD) unterstützt. Aber eine Implementierung für andere (hoffentlich genauere) Sensoren mit der PL-2303HXD-Schnittstelle scheint keine riesigen Anpassungen zu erfordern. Bei den technischen Details zum Ansprechen der Schnittstelle habe ich von diesem Treiber:
+	https://github.com/sintrb/Android-PL2303HXA/blob/master/Android-PL2303HXA/src/com/sin/android/usb/pl2303hxa/PL2303Driver.java
+Ansonsten habe ich zur Verwendung des USB-Gerätes die entsprechenden Android-Klassen benutzt, wie in diesem Tutorial beschrieben:
+	https://developer.android.com/guide/topics/connectivity/usb/host.html#working-d
+
+Um die Funktionsweise der Klasse zu beschreiben, stelle ich die Probleme bei der Entwicklung und deren Lösungen gegenüber, und zwar in folgender Reihenfolge:
+Ansprechen der USB-Schnittstelle
+Lesen der Daten
+Verarbeitung der Daten
+Datenübertragung (z.B. vom TrackingService zur Map)
+
+Ansprechen der USB-Schnittstelle:
+Das größte Problem beim Ansprechen der USB-Schnittstelle war, dass niemand im Team Erfahrung damit hatte. Der Treiber von github hat dort weitergeholfen. Aufgrund weiter bestehender Unwissenheit kann an dieser Stelle nicht mehr erklärt werden.
+
+Lesen der Daten:
+Problem: Pro Sekunde wird nur ein Paket von 6 NMEA-Sätzen vom Gerät bereitgestellt. Das heißt, der GGA-Datensatz, den man benötigt, wird nur einmal pro Sekunde gelesen. Bei GPS-Empfang ist das kein Problem, da alle Felder des Satzes besetzt sind. Ohne GPS-Empfang sind die Felder jedoch leer. D.h. es passen mehr Sätze in den Buffer, aber es dauert deswegen auch länger, bis dieser vollgeschrieben ist. Das führt zu einer längeren Lesezeit.
+Bei einem festen Polling-Intervall kann das dazu führen, dass die Lesezeit das Intervall überschreitet. Dadurch entstehen mehre Threads gleichzeitig, was zu einem Slowdown oder sogar einem Absturz führt.
+Lösung: Multithreading (damit die lange Lesedauer im Hintergrund ausgeführt wird) und Verzichten auf ein festes Polling-Intervall...
+
+Verarbeitung der Daten:
+Aus dem vollen Buffer bekommt man dann einen String. Mit den String-Methoden in Java kann man diesen ganz einfach zerlegen und nach einem GGA-Datensatz suchen. mit split(",") kommt man dann in diesem Satz an die einzelnen Einträge. Praktischerweise sind dann dieselben Werte immer an derselben Stelle im Array.
+Problem: Das umwandeln der Daten in double-Werte ist etwas problematisch. Man kann die Strings mit Breiten- und Längengrad nicht einfach parsen. Zwar bekäme man dann auch double-Werte, allerdings sind diese falsch. Ich habe keine Ahnung, warum der Gerätehersteller entschieden hat, die werte als Dezimalzahlen weiterzugeben, aber eigentlich liegen die Rohdaten im Grad-Minute-Sekunden-Format vor.
+Lösung: Man zerlegt einfach die Rohdaten in einzelne Werte für Minuten und Sekunden und rechnet diese dann in Anteile eines Grades um, um eine valide Dezimalzahl zu erzeugen, die von Mapbox benötigt wird.
+
+Datenübertragung:
+Zur Datenübertragung registriert man einfach einen GPSDataReceiver (das ist auch ein Interface, das die Klasse, die Location-Updates erhalten will, implementieren soll) in der GPS-Klasse. Dann ruft das GPS bei einem Update die implementierte Methode aus dem Interface auf.
+Problematisch wird aber die Nutzung der Klasse in mehreren Klassen mit verschiedenen Contexts: Wir bekommen die Daten vom GPS in einem Service, wollen aber schon vorher in der Activity das externe GPS initialisieren und auch nachher Daten vom Service zur Activity bekommen. Man kann aber leider keine Referenz zur GPS-Klasse mit einem Intent an den TrackingService weitergeben.
+Lösung:
+Die GPS-Klasse als Singleton verwenden. Wir können das externe GPS sowieso nur einmal nutzen, weil wir das nur einmal haben. Durch den Singleton muss man aber einige Fälle abfangen, die durch ein einfaches Zerstören der Klasse nicht aufgetreten wären. Deswegen sieht der Code jetzt etwas unübersichtlich aus. Mit mehr Zeit hätte man da sicher noch mehr Struktur reinbekommen...
