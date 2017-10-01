@@ -81,14 +81,14 @@ Genaueres sollte in der Klasse GPSTester.java stehen (bitte auch Kommentare beac
 
 Bevor ich auf die Funktionalität der Klasse eingehe, möchte ich auf meinen Einstieg in das Thema eingehen:
 Mangels Erfahrung mit dem Thema wurde sehr viel Zeit mit der Recherche und mit Testen (auch mit viel Trial-and-Error) verbracht. Deswegen wird aktuell nur ein Sensor (Navilock NL-650US mit GPS-Chipsatz MediaTek MT3337 und der RS-232 to USB-Schnittstelle Prolific PL-2303HXD) unterstützt. Aber eine Implementierung für andere (hoffentlich genauere) Sensoren mit der PL-2303HXD-Schnittstelle scheint keine riesigen Anpassungen zu erfordern. Bei den technischen Details zum Ansprechen der Schnittstelle habe ich von diesem Treiber:
-	https://github.com/sintrb/Android-PL2303HXA/blob/master/Android-PL2303HXA/src/com/sin/android/usb/pl2303hxa/PL2303Driver.java
+	https://github.com/sintrb/Android-PL2303HXA/blob/master/Android-PL2303HXA/src/com/sin/android/usb/pl2303hxa/PL2303Driver.java .
 Ansonsten habe ich zur Verwendung des USB-Gerätes die entsprechenden Android-Klassen benutzt, wie in diesem Tutorial beschrieben:
-	https://developer.android.com/guide/topics/connectivity/usb/host.html#working-d
+	https://developer.android.com/guide/topics/connectivity/usb/host.html#working-d .
 
 Um die Funktionsweise der Klasse zu beschreiben, stelle ich die Probleme bei der Entwicklung und deren Lösungen gegenüber, und zwar in folgender Reihenfolge:
-Ansprechen der USB-Schnittstelle
-Lesen der Daten
-Verarbeitung der Daten
+Ansprechen der USB-Schnittstelle,
+Lesen der Daten,
+Verarbeitung der Daten,
 Datenübertragung (z.B. vom TrackingService zur Map)
 
 - Ansprechen der USB-Schnittstelle:
