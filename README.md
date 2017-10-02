@@ -12,11 +12,8 @@ Map ist die Haupt-Activity der App. Sie enthält die Mapbox-Karte und stellt den
 - DatabaseObserver: Schnittstelle zwischen der Map Activity und der Couchbase-Datenbank.
 
 Sollte bei Nutzung des internen GPS der entsprechende Provider ausgeschaltet sein, wird beim Start der Map Activity entsprechend nachgefragt. Über onActivityResult() wird das Ergebnis dieses Aufrufs registriert und die Kamerasicht entsprechend aktualisiert. Sollten die notwendigen GPS-Permissions fehlen sein, wird mit einem ähnlichen Dialog nachgefragt.
-
 Die boolesche Variable pathTrackingEnabled gibt an, ob der aktuelle Pfad mitgeschnitten werden soll oder nicht. Diese wird durch Druck auf den Record-Button entsprechend gesetzt. Dabei wird entweder startNewRoute() oder stopCurrentRoute() aufgerufen. In startNewRoute() werden Initialisierungen durchgeführt und der TrackingService gestartet. In stopCurrentRoute() wird entsprechend die Aufnahme gestoppt und das Ergebnis als Polygon in die Couchbase-Datenbank geschrieben. Während der Aufnahme wird eine entsprechende Notification angezeigt und verhindert das die lokale SQLite-Datenbank (HelperDatabase) geschlossen wird.
-
 Die Methoden saveStatus() und loadStatus() schreiben bzw. lesen die pathTrackingEnabled-Variable genauso wie den zuletzt gespeicherten Zoom-Faktor in bzw. aus den SharedPreferences. Der Hintergrund ist, dass es sein kann, dass die App während des Trackings vom System zerstört wird. Beim erneuten Erstellen muss dem System irgendwie mitgeteilt werden, ob der TrackingService zur Zeit läuft oder nicht. Das passiert mithilfe der SharedPreferences.
-
 Mit der Flag useExternalGpsDevice kann spezifiziert werden, ob ein externes GPS-Gerät verwendet werden soll oder nicht. Je nachdem, wie diese Boolean-Flag gesetzt ist, beeinflusst vor allem die onCreate()-Methode in der Map Activity. Wird das interne GPS verwendet, funktioniert das Darstellen des aktuellen Standorts mit den Mapbox-spezifischen Funktionen (hier: setMyLocationEnabled(true)). Wird ein externer GPS-Provider benutzt, kann man diese Funktion nicht benutzen, sondern muss die Darstellung des eigenen Standorts selbst implementieren. Ist das GPS-Tracking aktiviert, können die entsprechenden Koordinaten unabhängig vom GPS-Provider bekommen werden, denn sie werden einfach als Broadcast vom TrackingService geschickt. Die TrackingService-Klasse implementiert dazu eigene LocationListener für jeden GPS-Provider und sendet immer dann einen Broadcast, wenn der aktuell gewählte Listener ein Update erhält. Dementsprechend wird die useExternalGpsDevice-Flag dem Intent zum Starten des TrackingService mitgegeben. Momentan muss diese Flag explizit im Code gesetzt werden. Es wäre aber leicht denkbar, sie auch dynamisch in den Einstellungen zu setzen.
 
 
@@ -30,11 +27,8 @@ TrackingService
 ===============
 
 Der TrackingService wird gestartet, wenn der Benutzer auf den Record-Button klickt. Dieser heißt intern "fabPath". Beim erneuten Klicken auf diesen Button wird der TrackingService beendet, Man kann dann entweder die Strecke als ein Polygon in die Datenbank speichern oder den gelaufenen Weg stornieren.
-
 Der Service läuft die ganze Zeit im Hintergrund und hat mehrere innere Klassen, die die ganze Zeit auf GPS-Daten hören. Jedes Mal, wenn eine neue Koordinate zur Verfügung steht, wird diese über einen Broadcast an die Map-Klasse geschickt. Dort wird die Koordinate empfangen und zur polylineOptions hinzugefügt. Aus diesen polylineOptions wird dann die gelaufene Strecke gezeichnet.
-
 Durch den TrackingService wird garantiert, dass die App, auch wenn sie minimiert ist (z.B. wenn ein Anruf kommt oder eine andere App gestartet wird), weiter den Weg mitverfolgt. Wenn der Service keine Koordinaten an die Map Activity senden kann, weil diese z.B. aufgrund des mangelnden Arbeitsspeichers zerstört wurde, schreibt er die Koordinaten in die interne Datenbank. Wenn die Map Activity gestartet wird, liest sie alle Koordinaten aus dieser lokalen Datenbank aus.
-
 Im TrackingService sind als innere Klasse ein TrackingLocationListener und ein TrackingGpsDataReceiver implementiert. Der TrackingLocationListener ist ein LocationListener, der auf Signale des eingebauten GPS-Providers hört. Der TrackingGpsDataReceiver ist eine selbst implementierte Klasse, die Standortdaten vom externen GPS-Provider (in diesem Fall das Gerät von Navilock) verarbeitet. Beim Starten des Services wird dem Intent eine Boolean-Flag mitgegeben, ob der externe GPS-Provider verwendet werden soll oder nicht.
 
 
@@ -53,51 +47,45 @@ Wir nutzen eine lokale SQLite-Datenbank, die HelperDatabase, um den aktuell verf
 Couchbase Database
 ==================
 
-Wir nutzen eine Couchbase Datenbank, um die aufgenommenen Polygone zu speichern. Die Datenbank ist nach dem Observer Pattern implementiert, sodass bei einer Änderung in 
-der Datenbank alle entsprechenden Anwendungen (Liste der Polygone, etc) aktualisiert werden.
+Wir nutzen eine Couchbase Datenbank, um die aufgenommenen Polygone zu speichern. Die Datenbank ist nach dem Observer Pattern implementiert, sodass bei einer Änderung in der Datenbank alle entsprechenden Anwendungen (Liste der Polygone etc.) aktualisiert werden.
 
 
 DBContent
 =========
 
-Hier sieht der Benutzer alle gespeicherten Polygone mit den Hauptcharakteristika. Wählt der Nutzer eines der Polygone durch ein kurzes Antippen aus,
-so wird er zur Hauptklasse mit der Karte weitergeleitet und sieht das ausgewählte Polygon eingezeichnet in die Karte. Tippt der Nutzer dahingegen 
-eines der Polygone in der Liste länger an, so kann er das gespeicherte Polygon entweder löschen oder editieren.
+Hier sieht der Benutzer alle gespeicherten Polygone mit den Hauptcharakteristika. Wählt der Nutzer eines der Polygone durch ein kurzes Antippen aus, so wird er zur Hauptklasse mit der Karte weitergeleitet und sieht das ausgewählte Polygon eingezeichnet in die Karte. Tippt der Nutzer dahingegen eines der Polygone in der Liste länger an, so kann er das gespeicherte Polygon entweder löschen oder editieren.
 
 
 Layout
 ======
 
-Das Layout orientiert sich am Layout der Kartenanwedung GoogleMaps, sodass ein Benutzer der App eine vertraute Umgebung vorfindet und sich schnell zurechtfindet.
-Dafür wird in der Hauptklasse ein DrawerLayout verwendet.
+Das Layout orientiert sich am Layout der Kartenanwedung GoogleMaps, sodass ein Benutzer der App eine vertraute Umgebung vorfindet und sich schnell zurechtfindet. Dafür wird in der Hauptklasse ein DrawerLayout verwendet.
+
 
 GPS
 ===
 
-Benutzung der Klasse:
-Um die Klasse in Map.java zu benutzen, muss man, wie oben beschrieben, die Flag useExternalGpsDevice auf true setzen und neu kompilieren. Leider geht das noch nicht dynamisch, weil die Klasse noch unfertig (ist ein Prototyp ja sowieso) und provisorisch eingebunden wurde. Mit der Flag auf false kann höchtens die Test-Activity unter dem Menüpunkt "GPS" benutzt werden.
-Die USB-Events werden eigentlich automatisch behandelt (falls die Klasse richtig in eine Activity eingebunden wurde). Dann wird eine Verbindung zum Gerät hergestellt und man kann dann später den Polling-Prozess starten um Location-Updates zu bekommen. Aktuell gibt es noch Probleme mit dem Multithreading, also sollte man den Polling-Prozess in der Activity manuell beenden und dann erst die Activity beenden oder das Gerät entfernen.
-Genaueres sollte in der Klasse GPSTester.java stehen (bitte auch Kommentare beachten).
+Benutzung der Klasse
 
-Bevor ich auf die Funktionalität der Klasse eingehe, möchte ich auf meinen Einstieg in das Thema eingehen:
-Mangels Erfahrung mit dem Thema wurde sehr viel Zeit mit der Recherche und mit Testen (auch mit viel Trial-and-Error) verbracht. Deswegen wird aktuell nur ein Sensor (Navilock NL-650US mit GPS-Chipsatz MediaTek MT3337 und der RS-232 to USB-Schnittstelle Prolific PL-2303HXD) unterstützt. Aber eine Implementierung für andere (hoffentlich genauere) Sensoren mit der PL-2303HXD-Schnittstelle scheint keine riesigen Anpassungen zu erfordern. Bei den technischen Details zum Ansprechen der Schnittstelle habe ich von diesem Treiber:
-	https://github.com/sintrb/Android-PL2303HXA/blob/master/Android-PL2303HXA/src/com/sin/android/usb/pl2303hxa/PL2303Driver.java .
+Um die Klasse in Map.java zu benutzen, muss man, wie oben beschrieben, die Flag useExternalGpsDevice auf true setzen und neu kompilieren. Leider geht das noch nicht dynamisch, weil die Klasse noch unfertig ist und provisorisch eingebunden wurde. Mit der Flag auf false kann aber trotzdem die Test-Activity unter dem Menüpunkt "GPS" benutzt werden, die die GPS-Koordinaten vom externen Gerät in entsprechenden Textfeldern anzeigt.
+Die USB-Events werden eigentlich automatisch behandelt (falls die Klasse richtig in eine Activity eingebunden wurde). Dann wird eine Verbindung zum Gerät hergestellt und man kann später den Polling-Prozess starten, um Location-Updates zu bekommen. Aktuell gibt es noch Probleme mit dem Multithreading, also sollte man den Polling-Prozess in der Activity manuell beenden und dann erst die Activity beenden oder das Gerät entfernen. Genaueres sollte in der Klasse GPSTester.java stehen (bitte auch Kommentare beachten).
+
+Bevor ich auf die Funktionalität der Klasse eingehe, möchte ich auf meinen Einstieg in das Thema eingehen. Mangels Erfahrung mit dem Thema wurde sehr viel Zeit mit der Recherche und mit Testen (auch mit viel Trial-and-Error) verbracht. Deswegen wird aktuell nur ein Sensor (Navilock NL-650US mit GPS-Chipsatz MediaTek MT3337 und der RS-232 to USB-Schnittstelle Prolific PL-2303HXD) unterstützt. Aber eine Implementierung für andere (hoffentlich genauere) Sensoren mit der PL-2303HXD-Schnittstelle scheint keine riesigen Anpassungen zu erfordern. Bei den technischen Details zum Ansprechen der Schnittstelle habe ich mich von diesem Treiber inspirieren lassen:
+
+https://github.com/sintrb/Android-PL2303HXA/blob/master/Android-PL2303HXA/src/com/sin/android/usb/pl2303hxa/PL2303Driver.java
+
 Ansonsten habe ich zur Verwendung des USB-Gerätes die entsprechenden Android-Klassen benutzt, wie in diesem Tutorial beschrieben:
-	https://developer.android.com/guide/topics/connectivity/usb/host.html#working-d .
 
-Um die Funktionsweise der Klasse zu beschreiben, stelle ich die Probleme bei der Entwicklung und deren Lösungen gegenüber, und zwar in folgender Reihenfolge:
-Ansprechen der USB-Schnittstelle,
-Lesen der Daten,
-Verarbeitung der Daten,
-Datenübertragung (z.B. vom TrackingService zur Map)
+https://developer.android.com/guide/topics/connectivity/usb/host.html#working-d .
+
+Um die Funktionsweise der Klasse zu beschreiben, stelle ich die Probleme bei der Entwicklung und deren Lösungen gegenüber, und zwar in folgender Reihenfolge: Ansprechen der USB-Schnittstelle, Lesen der Daten, Verarbeitung der Daten, Datenübertragung (z.B. vom TrackingService zur Map)
 
 - Ansprechen der USB-Schnittstelle:
 Das größte Problem beim Ansprechen der USB-Schnittstelle war, dass niemand im Team Erfahrung damit hatte. Der Treiber von github hat dort weitergeholfen. Aufgrund weiter bestehender Unwissenheit kann an dieser Stelle nicht mehr erklärt werden.
 
 - Lesen der Daten:
-Problem: Pro Sekunde wird nur ein Paket von 6 NMEA-Sätzen vom Gerät bereitgestellt. Das heißt, der GGA-Datensatz, den man benötigt, wird nur einmal pro Sekunde gelesen. Bei GPS-Empfang ist das kein Problem, da alle Felder des Satzes besetzt sind. Ohne GPS-Empfang sind die Felder jedoch leer. D.h. es passen mehr Sätze in den Buffer, aber es dauert deswegen auch länger, bis dieser vollgeschrieben ist. Das führt zu einer längeren Lesezeit.
-Bei einem festen Polling-Intervall kann das dazu führen, dass die Lesezeit das Intervall überschreitet. Dadurch entstehen mehre Threads gleichzeitig, was zu einem Slowdown oder sogar einem Absturz führt.
-Lösung: Multithreading (damit die lange Lesedauer im Hintergrund ausgeführt wird) und Verzichten auf ein festes Polling-Intervall...
+Problem: Pro Sekunde wird nur ein Paket von 6 NMEA-Sätzen vom Gerät bereitgestellt. Das heißt, der GGA-Datensatz, den man benötigt, wird nur einmal pro Sekunde gelesen. Bei GPS-Empfang ist das kein Problem, da alle Felder des Satzes besetzt sind. Ohne GPS-Empfang sind die Felder jedoch leer. D.h. es passen mehr Sätze in den Buffer, aber es dauert deswegen auch länger, bis dieser vollgeschrieben ist. Das führt zu einer längeren Lesezeit. Bei einem festen Polling-Intervall kann das dazu führen, dass die Lesezeit das Intervall überschreitet. Dadurch entstehen mehrere Threads gleichzeitig, was zu einem Slowdown oder sogar einem Absturz führt.
+Lösung: Multithreading (damit die lange Lesedauer im Hintergrund ausgeführt wird) und Verzichten auf ein festes Polling-Intervall.
 
 - Verarbeitung der Daten:
 Aus dem vollen Buffer bekommt man dann einen String. Mit den String-Methoden in Java kann man diesen ganz einfach zerlegen und nach einem GGA-Datensatz suchen. mit split(",") kommt man dann in diesem Satz an die einzelnen Einträge. Praktischerweise sind dann dieselben Werte immer an derselben Stelle im Array.
@@ -107,5 +95,4 @@ Lösung: Man zerlegt einfach die Rohdaten in einzelne Werte für Minuten und Sek
 - Datenübertragung:
 Zur Datenübertragung registriert man einfach einen GPSDataReceiver (das ist auch ein Interface, das die Klasse, die Location-Updates erhalten will, implementieren soll) in der GPS-Klasse. Dann ruft das GPS bei einem Update die implementierte Methode aus dem Interface auf.
 Problematisch wird aber die Nutzung der Klasse in mehreren Klassen mit verschiedenen Contexts: Wir bekommen die Daten vom GPS in einem Service, wollen aber schon vorher in der Activity das externe GPS initialisieren und auch nachher Daten vom Service zur Activity bekommen. Man kann aber leider keine Referenz zur GPS-Klasse mit einem Intent an den TrackingService weitergeben.
-Lösung:
-Die GPS-Klasse als Singleton verwenden. Wir können das externe GPS sowieso nur einmal nutzen, weil wir das nur einmal haben. Durch den Singleton muss man aber einige Fälle abfangen, die durch ein einfaches Zerstören der Klasse nicht aufgetreten wären. Deswegen sieht der Code jetzt etwas unübersichtlich aus. Mit mehr Zeit hätte man da sicher noch mehr Struktur reinbekommen...
+Lösung: Die GPS-Klasse als Singleton verwenden. Wir können das externe GPS sowieso nur einmal nutzen, weil wir das nur einmal haben. Durch den Singleton muss man aber einige Fälle abfangen, die durch ein einfaches Zerstören der Klasse nicht aufgetreten wären. Deswegen sieht der Code jetzt etwas unübersichtlich aus. Mit mehr Zeit hätte man da sicher noch mehr Struktur reinbekommen.
